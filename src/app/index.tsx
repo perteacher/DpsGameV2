@@ -1309,8 +1309,14 @@ export default function App() {
 
       if (판매수집.length > 0) {
         set누적판매(p => p + 판매수집.length)
-        // 판매 XP: lv * 10 (일반 캐릭레벨 경험치)
-        const 판매XP = 판매수집.reduce((s, x) => s + x.lv * 10, 0)
+        // 판매 XP: 15강 이상만 획득 (원본 맵 사양)
+        // 15~30강: lv*10, 31~50강: lv*30, 51강+: lv*100 (강도별 가파른 증가)
+        const 판매XP = 판매수집.reduce((s, x) => {
+          if (x.lv < 15) return s
+          if (x.lv <= 30) return s + x.lv * 10
+          if (x.lv <= 50) return s + x.lv * 30
+          return s + x.lv * 100
+        }, 0)
         if (판매XP > 0) XP획득(판매XP)
         const parts: string[] = []
         if (판매무색 > 0) parts.push(`🔷+${숫자포맷(판매무색)}`)
