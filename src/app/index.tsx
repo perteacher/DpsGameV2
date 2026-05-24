@@ -329,6 +329,38 @@ function 현재슬롯수(공격수: number) {
   return 슬롯
 }
 
+// 타격수 보상 마일스톤 (원본 맵 string 1064~1184, 1220~1255)
+// 한국 단위: 만(1e4), 억(1e8), 조(1e12), 경(1e16), 해(1e20), 자(1e24)
+type 타격보상 = { ExP: number; 조각: number; 크리스탈박스: 크리스탈박스등급[]; 은하조각: number }
+const 타격마일스톤표: { 임계값: number; 라벨: string; 보상: 타격보상 }[] = [
+  { 임계값: 5e6,   라벨: '500만',  보상: { ExP: 100, 조각: 0, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 1e7,   라벨: '1000만', 보상: { ExP: 200, 조각: 1, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 2.5e7, 라벨: '2500만', 보상: { ExP: 300, 조각: 2, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 5e7,   라벨: '5000만', 보상: { ExP: 500, 조각: 3, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 1e8,   라벨: '1억',    보상: { ExP: 750, 조각: 5, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 2e8,   라벨: '2억',    보상: { ExP: 1000, 조각: 10, 크리스탈박스: ['노말'], 은하조각: 0 } },
+  { 임계값: 5e8,   라벨: '5억',    보상: { ExP: 2000, 조각: 30, 크리스탈박스: ['노말', '노말', '노말'], 은하조각: 0 } },
+  { 임계값: 1e9,   라벨: '10억',   보상: { ExP: 3000, 조각: 50, 크리스탈박스: ['노말', '노말', '노말', '노말', '노말'], 은하조각: 0 } },
+  { 임계값: 2e9,   라벨: '20억',   보상: { ExP: 4000, 조각: 70, 크리스탈박스: ['노말', '노말', '노말', '노말', '노말', '노말', '노말'], 은하조각: 0 } },
+  { 임계값: 3e9,   라벨: '30억',   보상: { ExP: 5000, 조각: 100, 크리스탈박스: ['노말', '노말', '노말', '노말', '노말', '노말', '노말', '노말', '노말', '노말'], 은하조각: 0 } },
+  { 임계값: 4e9,   라벨: '40억',   보상: { ExP: 7000, 조각: 150, 크리스탈박스: ['레어'], 은하조각: 0 } },
+  { 임계값: 8.6e9, 라벨: '86억',   보상: { ExP: 10000, 조각: 200, 크리스탈박스: ['레어', '레어'], 은하조각: 0 } },
+  { 임계값: 2.14e10, 라벨: '214억', 보상: { ExP: 30000, 조각: 500, 크리스탈박스: ['레어', '레어', '레어', '레어'], 은하조각: 0 } },
+  { 임계값: 4.29e10, 라벨: '429억', 보상: { ExP: 50000, 조각: 800, 크리스탈박스: ['레어', '레어', '레어', '레어', '레어', '레어'], 은하조각: 0 } },
+  { 임계값: 1e11,    라벨: '1000억', 보상: { ExP: 100000, 조각: 1500, 크리스탈박스: ['레어', '레어', '레어', '레어', '레어', '레어', '레어', '레어', '레어', '레어'], 은하조각: 0 } },
+  { 임계값: 1e12,    라벨: '1조',    보상: { ExP: 200000, 조각: 0, 크리스탈박스: ['유니크'], 은하조각: 0 } },
+  { 임계값: 1e13,    라벨: '10조',   보상: { ExP: 300000, 조각: 0, 크리스탈박스: ['유니크', '유니크', '유니크', '유니크', '유니크', '유니크', '유니크'], 은하조각: 0 } },
+  { 임계값: 1e14,    라벨: '100조',  보상: { ExP: 400000, 조각: 0, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 1e15,    라벨: '1000조', 보상: { ExP: 500000, 조각: 0, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 1e16,    라벨: '1경',    보상: { ExP: 1000000, 조각: 0, 크리스탈박스: ['퀘이사'], 은하조각: 0 } },
+  { 임계값: 5e16,    라벨: '5경',    보상: { ExP: 1000000, 조각: 0, 크리스탈박스: ['퀘이사', '퀘이사', '퀘이사'], 은하조각: 0 } },
+  { 임계값: 1e17,    라벨: '10경',   보상: { ExP: 1000000, 조각: 0, 크리스탈박스: ['퀘이사', '퀘이사', '퀘이사', '퀘이사', '퀘이사', '퀘이사', '퀘이사', '퀘이사', '퀘이사', '퀘이사'], 은하조각: 0 } },
+  { 임계값: 5e17,    라벨: '50경',   보상: { ExP: 1000000, 조각: 100, 크리스탈박스: [], 은하조각: 0 } },
+  { 임계값: 1e18,    라벨: '100경',  보상: { ExP: 1000000, 조각: 0, 크리스탈박스: [], 은하조각: 1 } },
+  { 임계값: 5e18,    라벨: '500경',  보상: { ExP: 1000000, 조각: 0, 크리스탈박스: [], 은하조각: 3 } },
+  { 임계값: 1e19,    라벨: '1000경', 보상: { ExP: 1000000, 조각: 0, 크리스탈박스: [], 은하조각: 5 } },
+]
+
 // ============================================
 // 상수
 // ============================================
@@ -387,6 +419,14 @@ type 몹 = {
   maxHp: number
   flashUntil: number
   deadUntil: number  // > now면 죽은 상태
+  티어: 1 | 2 | 3  // 사냥터 1/2/3 (1=1~25강, 2=26~40, 3=41~60 DPS측정기)
+}
+
+// 마린 강도 → 사냥터 티어
+function 사냥터티어(lv: number): 1 | 2 | 3 {
+  if (lv <= 25) return 1
+  if (lv <= 40) return 2
+  return 3
 }
 
 type 적 = {
@@ -638,12 +678,13 @@ function 초기적들(보스번호: number = 1): 적[] {
 }
 
 function 초기몹들(): 몹[] {
-  // 사냥터 1마리 (큰 몹, 가운데 위)
-  return [{
-    id: 0,
-    pos: { x: 필드_W / 2, y: 130 },
-    hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0,
-  }]
+  // 사냥터 1/2/3 (각각 LV.1 / LV.2 / LV.MAX 건물 + DPS측정기)
+  const y = 130
+  return [
+    { id: 0, pos: { x: 필드_W * 0.20, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 1 },
+    { id: 1, pos: { x: 필드_W * 0.50, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 2 },
+    { id: 2, pos: { x: 필드_W * 0.80, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 3 },
+  ]
 }
 
 // ============================================
@@ -698,6 +739,7 @@ export default function App() {
   const [고유유닛, set고유유닛] = useState<고유유닛스텟>(() => ({ ...초기고유유닛 }))
   const [고유유닛패널열림, set고유유닛패널열림] = useState(false)
   const [고유유닛pos, set고유유닛pos] = useState<Pos>({ x: 필드_W * 0.4, y: 200 })
+  const [고유유닛dest, set고유유닛dest] = useState<Pos | null>(null)
   const [고유유닛선택, set고유유닛선택] = useState(false)
   // 초월레벨
   const [초월레벨, set초월레벨] = useState(0)
@@ -713,6 +755,11 @@ export default function App() {
   const [은하조각, set은하조각] = useState(0)
   // 자각의 보주: 60강 판매 25% 드랍 (진각성 시스템용 - 미구현)
   const [자각보주, set자각보주] = useState(0)
+  // 타격수 마일스톤 획득 인덱스 (0부터 순서대로, 다음 미획득 인덱스)
+  const [타격수획득idx, set타격수획득idx] = useState(0)
+  // Extra LV 보상 받은 횟수 (보스처치수 / 6 또는 11 가준)
+  const [extraVI받음, setExtraVI받음] = useState(0)
+  const [extraXI받음, setExtraXI받음] = useState(0)
   // 영구강화 (무색조각/응무조 사용)
   const [업그레이드, set업그레이드] = useState({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
   // 패널
@@ -761,6 +808,7 @@ export default function App() {
   const 보석Ref = useRef(보석); 보석Ref.current = 보석
   const 고유유닛Ref = useRef(고유유닛); 고유유닛Ref.current = 고유유닛
   const 고유유닛posRef = useRef(고유유닛pos); 고유유닛posRef.current = 고유유닛pos
+  const 고유유닛destRef = useRef(고유유닛dest); 고유유닛destRef.current = 고유유닛dest
   const 고유유닛선택Ref = useRef(고유유닛선택); 고유유닛선택Ref.current = 고유유닛선택
   const 초월레벨Ref = useRef(초월레벨); 초월레벨Ref.current = 초월레벨
   const 초월잔여포인트Ref = useRef(초월잔여포인트); 초월잔여포인트Ref.current = 초월잔여포인트
@@ -769,6 +817,9 @@ export default function App() {
   const 확정강화권Ref = useRef(확정강화권); 확정강화권Ref.current = 확정강화권
   const 은하조각Ref = useRef(은하조각); 은하조각Ref.current = 은하조각
   const 자각보주Ref = useRef(자각보주); 자각보주Ref.current = 자각보주
+  const 타격수획득idxRef = useRef(타격수획득idx); 타격수획득idxRef.current = 타격수획득idx
+  const extraVI받음Ref = useRef(extraVI받음); extraVI받음Ref.current = extraVI받음
+  const extraXI받음Ref = useRef(extraXI받음); extraXI받음Ref.current = extraXI받음
   const 업그레이드Ref = useRef(업그레이드); 업그레이드Ref.current = 업그레이드
   const 자동강화ONRef = useRef(자동강화ON); 자동강화ONRef.current = 자동강화ON
   const 자동강화최대lvRef = useRef(자동강화최대lv); 자동강화최대lvRef.current = 자동강화최대lv
@@ -875,6 +926,9 @@ export default function App() {
           if (typeof d.확정강화권 === 'number') set확정강화권(d.확정강화권)
           if (typeof d.은하조각 === 'number') set은하조각(d.은하조각)
           if (typeof d.자각보주 === 'number') set자각보주(d.자각보주)
+          if (typeof d.타격수획득idx === 'number') set타격수획득idx(d.타격수획득idx)
+          if (typeof d.extraVI받음 === 'number') setExtraVI받음(d.extraVI받음)
+          if (typeof d.extraXI받음 === 'number') setExtraXI받음(d.extraXI받음)
           // 오프라인 보상
           if (typeof d.마지막저장시간 === 'number' && d.마지막저장시간 > 0) {
             const 경과초 = Math.min(8 * 3600, (Date.now() - d.마지막저장시간) / 1000)
@@ -909,6 +963,7 @@ export default function App() {
       일반스텟, 초월스텟, 명칭크리스탈,
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       각성의보석, ExPoint, 확정강화권, 은하조각, 자각보주,
+      타격수획득idx, extraVI받음, extraXI받음,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON,
       마지막저장시간: Date.now(),
@@ -921,6 +976,7 @@ export default function App() {
       일반스텟, 초월스텟, 명칭크리스탈,
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       각성의보석, ExPoint, 확정강화권, 은하조각, 자각보주,
+      타격수획득idx, extraVI받음, extraXI받음,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON, 로드완료])
 
@@ -992,6 +1048,7 @@ export default function App() {
       }
 
       let 추가미네랄 = 0  // 사냥터 mob 공격으로 획득
+      let 추가크레딧 = 0  // 사냥터 3 (DPS측정기) 공격으로 획득
       let 추가공격수 = 0
       let 잔여Mineral = currentMineral
       const 플래시적: number[] = []
@@ -1152,13 +1209,20 @@ export default function App() {
         const cd = 1000 / (공격속도(n.lv) * 공속배수)
 
         // 사냥터 (mob): 공격→미네랄 / 보스존: 공격→무색조각
-        function nearestMob(p: Pos): 몹 | undefined {
+        // 마린 강도 → 사냥터 티어 일치하는 mob만 타겟
+        function nearestMob(p: Pos, marineLv: number): 몹 | undefined {
+          const tier = 사냥터티어(marineLv)
           const list = 몹들Ref.current
-            .filter(m => m.deadUntil <= now)
+            .filter(m => m.deadUntil <= now && m.티어 === tier)
             .map(m => ({ m, d: 거리(p, m.pos) }))
-            .filter(x => x.d <= 공격사거리)
+            .filter(x => x.d <= 공격사거리 * 3)  // 사냥터 mob 거리 넉넉히
             .sort((a, b) => a.d - b.d)
           return list[0]?.m
+        }
+        // 가장 가까운 자기 티어 mob (사거리 무관 — auto-route)
+        function 자기티어몹(marineLv: number): 몹 | undefined {
+          const tier = 사냥터티어(marineLv)
+          return 몹들Ref.current.find(m => m.티어 === tier)
         }
 
         // 위치별 분기
@@ -1238,9 +1302,14 @@ export default function App() {
               n.공격플래시Until = now + 150
               const isCrit = Math.random() < 평균크리
               const dmg = 공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * (isCrit ? 2 : 1)
-              // 사냥터 공격력 +50% + 티어 배수 (1~25강=×1, 26~40강=×2, 41+강=×4)
-              const 사냥터티어 = n.lv <= 25 ? 1 : n.lv <= 40 ? 2 : 4
-              추가미네랄 += dmg * 1.5 * 사냥터티어 * currentBatch * 자원배수기여
+              // 티어별 보상 배수: 1=×1 mineral, 2=×3 mineral, 3=×6 mineral+credit (DPS측정기)
+              const tier = target.티어
+              const tierMul = tier === 1 ? 1 : tier === 2 ? 3 : 6
+              추가미네랄 += dmg * 1.5 * tierMul * currentBatch * 자원배수기여
+              // 사냥터 3 (DPS측정기) → 크레딧 소량 부가 획득 (dmg / 1000)
+              if (tier === 3) {
+                추가크레딧 += Math.max(1, Math.floor(dmg / 1000)) * (1 + 보석b.크레딧배수 - 1)
+              }
               추가공격수 += 1
               플래시몹.push(target.id)
               몹데미지맵.set(target.id, (몹데미지맵.get(target.id) ?? 0) + dmg)
@@ -1254,14 +1323,15 @@ export default function App() {
             return n
           }
           if (n.state === 'attack-move' && n.dest) {
-            const 가까운몹 = nearestMob(n.pos)
+            const 가까운몹 = nearestMob(n.pos, n.lv) ?? 자기티어몹(n.lv)
             if (가까운몹) { n.state = 'attacking'; n.타겟적id = 가까운몹.id; return n }
             n.pos = clampPos(이동좌표(n.pos, n.dest, 속도 * dt))
             if (거리(n.pos, n.dest) < 1) { n.dest = null; n.state = 'idle' }
             return n
           }
           if (n.state === 'idle' || n.state === 'hold') {
-            const 가까운몹 = nearestMob(n.pos)
+            // 자기 티어 mob 자동 타겟 (auto-route)
+            const 가까운몹 = nearestMob(n.pos, n.lv) ?? 자기티어몹(n.lv)
             if (가까운몹) { n.state = 'attacking'; n.타겟적id = 가까운몹.id }
             return n
           }
@@ -1354,10 +1424,24 @@ export default function App() {
         const 고유티어 = 고유유닛스텟cur.위치2 ? 2 : 1
         추가미네랄 += 고유DPS * 1.5 * 고유티어 * currentBatch * 자원배수기여 * dt
       }
+      // 고유유닛 dest 보간 이동 (smooth)
+      if (고유유닛destRef.current) {
+        const cur = 고유유닛posRef.current
+        const dst = 고유유닛destRef.current
+        const d = 거리(cur, dst)
+        if (d < 2) {
+          set고유유닛dest(null)
+        } else {
+          const 고유속도 = 속도 * 1.2
+          const next = 이동좌표(cur, dst, 고유속도 * dt)
+          set고유유닛pos(clampPosStatic(next))
+        }
+      }
 
       // currency 업데이트
       if (잔여Mineral !== currentMineral) setMineral(잔여Mineral + 추가미네랄)
       else if (추가미네랄 > 0) setMineral(prev => prev + 추가미네랄)
+      if (추가크레딧 > 0) set크레딧(prev => prev + Math.floor(추가크레딧))
       if (판매무색 > 0) set무색조각(prev => prev + 판매무색)
       if (판매응무조 > 0) set응무조(prev => prev + 판매응무조)
       if (판매크리조각 > 0) set크리스탈조각(prev => prev + 판매크리조각)
@@ -1407,7 +1491,41 @@ export default function App() {
         }
       }
 
-      if (추가공격수 > 0) set총공격수(prev => prev + 추가공격수)
+      if (추가공격수 > 0) {
+        const 새공격수 = 총공격수Ref.current + 추가공격수
+        set총공격수(새공격수)
+        // 🎯 타격수 마일스톤 보상 체크
+        let nextIdx = 타격수획득idxRef.current
+        let totalExP = 0, total조각 = 0, total은하 = 0
+        const total박스: 크리스탈박스등급[] = []
+        const claimedLabels: string[] = []
+        while (nextIdx < 타격마일스톤표.length && 새공격수 >= 타격마일스톤표[nextIdx].임계값) {
+          const m = 타격마일스톤표[nextIdx]
+          totalExP += m.보상.ExP
+          total조각 += m.보상.조각
+          total은하 += m.보상.은하조각
+          for (const b of m.보상.크리스탈박스) total박스.push(b)
+          claimedLabels.push(m.라벨)
+          nextIdx++
+        }
+        if (nextIdx > 타격수획득idxRef.current) {
+          set타격수획득idx(nextIdx)
+          if (totalExP > 0) setExPoint(prev => prev + totalExP)
+          if (total조각 > 0) set크리스탈조각(prev => prev + total조각)
+          if (total은하 > 0) set은하조각(prev => prev + total은하)
+          if (total박스.length > 0) {
+            set명칭크리스탈(prev => {
+              const next = { ...prev }
+              for (const 등급 of total박스) {
+                const k = 박스개봉(등급)
+                next[k] = (next[k] as number) + 1
+              }
+              return next
+            })
+          }
+          메시지표시(`🎯 타격수 ${claimedLabels.join(',')}회 보상! ⭐+${숫자포맷(totalExP)} 🔮+${total조각} 🌟${total박스.length}박스`)
+        }
+      }
 
       if (판매수집.length > 0) {
         set누적판매(p => p + 판매수집.length)
@@ -1466,6 +1584,26 @@ export default function App() {
         // 확정 강화권 (5보스마다 1개 + 2% 확률)
         const 권드랍 = (baseN + 1) % 5 === 0 ? 1 : 0
         if (권드랍 > 0 || Math.random() < 0.02) set확정강화권(prev => prev + Math.max(1, 권드랍))
+        // 🎉 Extra LV. VI (파티보스 6단계): 6보스마다 1회 보상
+        // 보상: 확정강화권 1, 캐릭레벨 +1500 효과 (실제는 ExP +500 + 큰 XP), ExPoint 500
+        if ((baseN + 1) % 6 === 0) {
+          const 회 = extraVI받음Ref.current + 1
+          setExtraVI받음(회)
+          set확정강화권(prev => prev + 1)
+          setExPoint(prev => prev + 500)
+          XP획득(500 * 3 * 100)  // 일반Lv +500*3 (대략)
+          메시지표시(`🎉 Extra LV. VI (${회}회차) 클리어! 🎟️+1 ⭐+500 + 일반 XP 폭증`)
+        }
+        // 🎉 Extra LV. XI (파티보스 11단계): 11보스마다 1회 보상
+        // 보상: 확정강화권 6, 크레딧 +200만, ExPoint 2500
+        if ((baseN + 1) % 11 === 0) {
+          const 회 = extraXI받음Ref.current + 1
+          setExtraXI받음(회)
+          set확정강화권(prev => prev + 6)
+          set크레딧(prev => prev + 2000000)
+          setExPoint(prev => prev + 2500)
+          메시지표시(`🎊 Extra LV. XI (${회}회차) 클리어! 🎟️+6 💰+200만 ⭐+2500`)
+        }
         // 보주 드랍 (50%)
         if (Math.random() < 0.5) {
           const 종류 = 보주종류목록[Math.floor(Math.random() * 보주종류목록.length)]
@@ -1763,9 +1901,16 @@ export default function App() {
             }
             return
           }
-          if (고유유닛선택Ref.current) {
-            set고유유닛pos(clampPosStatic(end))
+          // 고유유닛 선택 + 빈 곳 탭 = 이동 + 자동 해제 (마린 명령 회복)
+          // 단, 마린 탭이면 아래 처리로 위임 (해제 후 마린 선택)
+          if (고유유닛선택Ref.current && !마린 && !적) {
+            set고유유닛dest(clampPosStatic(end))
+            set고유유닛선택(false)
             return
+          }
+          // 마린/적 탭 시 고유유닛 선택 해제 후 일반 처리
+          if (고유유닛선택Ref.current) {
+            set고유유닛선택(false)
           }
         }
 
@@ -1823,7 +1968,9 @@ export default function App() {
     set업그레이드({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
     set캐릭레벨(1); set경험치(0); set잔여포인트(0)
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
-    set초월스텟({ 추가초월확률: 0 })
+    set초월스텟({ 추가초월확률: 0, 강화51_53: 0, 업그51_56: 0, 공격57_59: 0, 융합56: 0, 보스데미지: 0 })
+    set각성의보석(0); setExPoint(0); set확정강화권(0); set은하조각(0); set자각보주(0)
+    set타격수획득idx(0); setExtraVI받음(0); setExtraXI받음(0)
     set명칭크리스탈({ ...초기명칭크리스탈 })
     set크레딧(0)
     set보석({ ...초기보석 })
@@ -2032,25 +2179,39 @@ export default function App() {
           </View>
         )}
 
-        {/* HUNTING: 몹 1마리 (무적, 큰 크기) */}
+        {/* HUNTING: 사냥터 1/2/3 mob (각각 다른 강도 범위) */}
         {현재화면 === 'hunting' && 몹들.map(mb => {
           const flash = mb.flashUntil > now
+          const 정보 = mb.티어 === 1
+            ? { 이모지: '🏚️', 색: '#7ed957', 라벨: 'LV.1 (1~25강)', 크기: 80 }
+            : mb.티어 === 2
+            ? { 이모지: '🏛️', 색: '#4a90e2', 라벨: 'LV.2 (26~40강)', 크기: 90 }
+            : { 이모지: '📡', 색: '#f5a623', 라벨: 'LV.MAX 💰(41~60강)', 크기: 100 }
+          const 사이즈 = 정보.크기
+          // 티어별 DPS (마린)
+          const 티어DPS = 사냥터마린들
+            .filter(m => 사냥터티어(m.lv) === mb.티어)
+            .reduce((s, m) => s + 공격력(m.lv, 초월스텟.업그51_56, 초월스텟.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * (1 + _크리r), 0)
           return (
             <View key={mb.id} pointerEvents="none">
               <View style={[styles.enemy, {
-                left: mb.pos.x - 몹_크기 / 2,
-                top: mb.pos.y - 몹_크기 / 2,
-                backgroundColor: flash ? '#ff6b6b' : '#4a4a8a',
-                borderColor: '#7a7aaa',
-                width: 몹_크기, height: 몹_크기,
-                borderRadius: 몹_크기 / 2,
+                left: mb.pos.x - 사이즈 / 2,
+                top: mb.pos.y - 사이즈 / 2,
+                backgroundColor: flash ? '#ff6b6b' : 정보.색 + '40',
+                borderColor: 정보.색,
+                width: 사이즈, height: 사이즈,
+                borderRadius: 사이즈 / 2,
               }]}>
-                <Text style={{ fontSize: 56 }}>🐺</Text>
+                <Text style={{ fontSize: Math.floor(사이즈 * 0.6) }}>{정보.이모지}</Text>
               </View>
               <Text style={[styles.bossLabel, {
-                left: mb.pos.x - 100, top: mb.pos.y - 몹_크기 / 2 - 22, width: 200,
-                color: '#7ed957', fontSize: 12, fontWeight: 'bold',
-              }]}>⚔️ DPS {숫자포맷(사냥터마린DPS)}</Text>
+                left: mb.pos.x - 80, top: mb.pos.y - 사이즈 / 2 - 32, width: 160,
+                color: 정보.색, fontSize: 10, fontWeight: 'bold',
+              }]}>{정보.라벨}</Text>
+              <Text style={[styles.bossLabel, {
+                left: mb.pos.x - 80, top: mb.pos.y - 사이즈 / 2 - 18, width: 160,
+                color: '#fff', fontSize: 11, fontWeight: 'bold',
+              }]}>⚔️ {숫자포맷(티어DPS)}</Text>
             </View>
           )
         })}
