@@ -141,24 +141,53 @@ function 강화실패결과(lv: number, 파괴방지: number = 0): { 감소: num
   return { 감소: 0, 파괴: true }  // 파괴
 }
 
-// 마린 무기 공식: base=6, upg_bonus=18 (원본 맵 UNIx 데이터)
-// 1강=6, 10강=168, 30강=528, 50강=888
-// 51~56강: 추가 51_56업그 보너스 합산 (초월 스탯 1 = +9 데미지)
-// 57~59강: 추가 57_59공격 보너스 합산 (초월 스탯 1 = +8 데미지)
+// 공격력 공식 — 원본 맵 (Marine Gauss Rifle W0: base=6, upg=+1/lv)
+// 강도 = Terran Infantry Weapons upgrade level (1-60강)
+// 6 tier 마다 unit class 변경 (sprite type 1~10):
+//   1~6강 Marine: base 6, +1/lv
+//   7~12강 Firebat: base 16, +2/lv
+//   13~18강 Ghost: base 10, +3/lv (커스텀)
+//   19~24강 Vulture: base 20, +4/lv
+//   25~30강 Goliath: base 24, +6/lv
+//   31~36강 Tank Siege: base 70, +8/lv
+//   37~42강 Wraith Air: base 40, +10/lv
+//   43~48강 Battlecruiser: base 50, +15/lv
+//   49~54강 Hero Tier: base 150, +20/lv
+//   55~60강 Final Tier: base 300, +30/lv
+const _공격력테이블: { 시작: number; base: number; upg: number }[] = [
+  { 시작: 1,  base: 6,   upg: 1 },
+  { 시작: 7,  base: 16,  upg: 2 },
+  { 시작: 13, base: 10,  upg: 3 },
+  { 시작: 19, base: 20,  upg: 4 },
+  { 시작: 25, base: 24,  upg: 6 },
+  { 시작: 31, base: 70,  upg: 8 },
+  { 시작: 37, base: 40,  upg: 10 },
+  { 시작: 43, base: 50,  upg: 15 },
+  { 시작: 49, base: 150, upg: 20 },
+  { 시작: 55, base: 300, upg: 30 },
+]
 function 공격력(단계: number, 초월업51_56: number = 0, 초월공57_59: number = 0) {
-  let base = 6 + (단계 - 1) * 18
-  if (단계 >= 51 && 단계 <= 56) base += 초월업51_56 * 9
-  if (단계 >= 57 && 단계 <= 59) base += 초월공57_59 * 8
-  return base
+  let tier = _공격력테이블[0]
+  for (const t of _공격력테이블) if (단계 >= t.시작) tier = t
+  let dmg = tier.base + (단계 - tier.시작) * tier.upg
+  if (단계 >= 51 && 단계 <= 56) dmg += 초월업51_56 * 9
+  if (단계 >= 57 && 단계 <= 59) dmg += 초월공57_59 * 8
+  return dmg
 }
 
+// 공격속도 — 6 단계 (원본 맵 BW unit class cooldown 기반)
+// 1~10강: 1.0 atk/s (Marine 15f)
+// 11~20강: 1.5 (Firebat 22f → boosted)
+// 21~30강: 2.0 (Ghost 22f → boosted)
+// 31~40강: 2.5 (Vulture/Goliath)
+// 41~50강: 3.0 (Tank ranged 30f)
+// 51~60강: 4.0 (Heavy hero)
 function 공격속도(단계: number) {
-  if (단계 < 10) return 1.0
-  if (단계 < 20) return 1.5
-  if (단계 < 30) return 2.0
-  if (단계 < 40) return 2.5
-  if (단계 < 50) return 3.0
-  if (단계 < 56) return 3.5
+  if (단계 <= 10) return 1.0
+  if (단계 <= 20) return 1.5
+  if (단계 <= 30) return 2.0
+  if (단계 <= 40) return 2.5
+  if (단계 <= 50) return 3.0
   return 4.0
 }
 
@@ -396,8 +425,19 @@ const 강화쿨다운 = 800  // 0.8초마다 자동 강화 시도
 
 type Pos = { x: number; y: number }
 type 유닛상태 = 'idle' | 'move' | 'attack-move' | 'hold' | 'attacking'
-type 화면 = 'base' | 'hunting' | 'boss'
-type 유닛위치 = 'base' | 'hunting' | 'boss'
+type 화면 = 'base' | 'hunting1' | 'hunting2' | 'hunting3' | 'boss'
+type 유닛위치 = 'base' | 'hunting1' | 'hunting2' | 'hunting3' | 'boss'
+
+// 마린 강도 → 사냥터 화면 매핑
+function 사냥화면(lv: number): 'hunting1' | 'hunting2' | 'hunting3' {
+  if (lv <= 25) return 'hunting1'
+  if (lv <= 40) return 'hunting2'
+  return 'hunting3'
+}
+// 화면이 사냥터인지
+function is사냥터(s: 화면): s is 'hunting1' | 'hunting2' | 'hunting3' {
+  return s === 'hunting1' || s === 'hunting2' || s === 'hunting3'
+}
 
 type 마린 = {
   id: number
@@ -517,10 +557,10 @@ type 고유유닛스텟 = {
   경험치: number   // 0~5, 강화당 경험치 +20%
   추가1강: number  // 0~20, 강화당 +1강 확률 +0.25%
   특수강화: number // 0~10, 강화당 특수강화 확률 +0.5%
-  위치2: boolean   // false=사냥터1, true=사냥터2
+  위치: 1 | 2 | 3  // 사냥터 1/2/3 어느 화면에 배치할지
   파괴방지: number // 0~200, 강화당 파괴방지 +0.1%
 }
-const 초기고유유닛: 고유유닛스텟 = { 공격력: 0, 공속: 0, 경험치: 0, 추가1강: 0, 특수강화: 0, 위치2: false, 파괴방지: 0 }
+const 초기고유유닛: 고유유닛스텟 = { 공격력: 0, 공속: 0, 경험치: 0, 추가1강: 0, 특수강화: 0, 위치: 1, 파괴방지: 0 }
 
 function 고유유닛공격력(스텟: 고유유닛스텟) { return 500 + 스텟.공격력 * 500 }
 function 고유유닛공속(스텟: 고유유닛스텟): number {
@@ -555,7 +595,7 @@ function 점이구역안에(점: Pos, z: 구역) {
 let 다음마린ID = 0
 function 새마린ID() { return 다음마린ID++ }
 
-function 새마린(lv: number, pos: Pos, location: 'base' | 'hunting' = 'base'): 마린 {
+function 새마린(lv: number, pos: Pos, location: 유닛위치 = 'base'): 마린 {
   return {
     id: 새마린ID(),
     lv,
@@ -692,12 +732,12 @@ function 초기적들(보스번호: number = 1): 적[] {
 }
 
 function 초기몹들(): 몹[] {
-  // 사냥터 1/2/3 (각각 LV.1 / LV.2 / LV.MAX 건물 + DPS측정기)
-  const y = 130
+  // 사냥터 1/2/3 (각 별도 화면 — 중앙에 배치)
+  const y = 150
   return [
-    { id: 0, pos: { x: 필드_W * 0.20, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 1 },
-    { id: 1, pos: { x: 필드_W * 0.50, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 2 },
-    { id: 2, pos: { x: 필드_W * 0.80, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 3 },
+    { id: 0, pos: { x: 필드_W / 2, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 1 },
+    { id: 1, pos: { x: 필드_W / 2, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 2 },
+    { id: 2, pos: { x: 필드_W / 2, y }, hp: 99999, maxHp: 99999, flashUntil: 0, deadUntil: 0, 티어: 3 },
   ]
 }
 
@@ -854,9 +894,15 @@ export default function App() {
   const fieldRef = useRef<any>(null)
 
   const 베이스마린들 = 마린들.filter(m => m.location === 'base')
-  const 사냥터마린들 = 마린들.filter(m => m.location === 'hunting')
+  const 사냥터마린들 = 마린들.filter(m => is사냥터(m.location as 화면))
+  const 사냥터1마린들 = 마린들.filter(m => m.location === 'hunting1')
+  const 사냥터2마린들 = 마린들.filter(m => m.location === 'hunting2')
+  const 사냥터3마린들 = 마린들.filter(m => m.location === 'hunting3')
   const 보스존마린들 = 마린들.filter(m => m.location === 'boss')
-  const 화면마린들 = 현재화면 === 'hunting' ? 사냥터마린들 : 현재화면 === 'boss' ? 보스존마린들 : 베이스마린들
+  const 화면마린들 = 현재화면 === 'hunting1' ? 사냥터1마린들
+    : 현재화면 === 'hunting2' ? 사냥터2마린들
+    : 현재화면 === 'hunting3' ? 사냥터3마린들
+    : 현재화면 === 'boss' ? 보스존마린들 : 베이스마린들
   // 보주 효과 합산 (렌더 시점)
   const _보주공격r = 보주합산(보주, '공격')
   const _보주크리r = 보주합산(보주, '크리')
@@ -888,13 +934,18 @@ export default function App() {
         try {
           const d = JSON.parse(json)
           if (d.마린들 && Array.isArray(d.마린들)) {
-            const restored = d.마린들.map((m: any) => ({
-              ...새마린(m.lv || 1, m.pos || 베이스시작위치(0)),
-              id: m.id,
-              lv: m.lv || 1,
-              pos: m.pos || 베이스시작위치(0),
-              location: m.location || 'base',
-            }))
+            const restored = d.마린들.map((m: any) => {
+              // 마이그레이션: 옛 'hunting' → 강도별 hunting1/2/3
+              let loc = m.location || 'base'
+              if (loc === 'hunting') loc = 사냥화면(m.lv || 1)
+              return {
+                ...새마린(m.lv || 1, m.pos || 베이스시작위치(0)),
+                id: m.id,
+                lv: m.lv || 1,
+                pos: m.pos || 베이스시작위치(0),
+                location: loc,
+              }
+            })
             다음마린ID = Math.max(...restored.map((m: 마린) => m.id), 0) + 1
             set마린들(restored)
           }
@@ -943,7 +994,7 @@ export default function App() {
           if (typeof d.마지막저장시간 === 'number' && d.마지막저장시간 > 0) {
             const 경과초 = Math.min(8 * 3600, (Date.now() - d.마지막저장시간) / 1000)
             if (경과초 > 60 && d.마린들) {
-              const huntingMs = d.마린들.filter((m: any) => m.location === 'hunting')
+              const huntingMs = d.마린들.filter((m: any) => m.location === 'hunting1' || m.location === 'hunting2' || m.location === 'hunting3' || m.location === 'hunting')
               const dps = huntingMs.reduce((s: number, m: any) => s + 유닛DPS(m.lv || 1), 0)
               if (dps > 0) {
                 const 보상 = Math.floor(dps * 자원배수(d.최고DPS || 0) * 경과초 * 0.5)
@@ -1012,7 +1063,7 @@ export default function App() {
       const currentMarines = 마린들Ref.current
       const currentEnemies = 적들Ref.current
       const currentMineral = mineralRef.current
-      const huntingMarines = currentMarines.filter(m => m.location === 'hunting')
+      const huntingMarines = currentMarines.filter(m => is사냥터(m.location as 화면))
       const bossMarines = currentMarines.filter(m => m.location === 'boss')
 
       // 보주 멀티플라이어 사전 계산 (count-based)
@@ -1063,9 +1114,7 @@ export default function App() {
       const 플래시적: number[] = []
       const 플래시몹: number[] = []
       const 몹데미지맵 = new Map<number, number>()
-      let 사냥터추가 = 0
       let 베이스추가 = 0
-      const 기존사냥터수 = huntingMarines.length
       const 기존베이스수 = currentMarines.length - huntingMarines.length
 
       // 인덱스 도우미
@@ -1079,7 +1128,10 @@ export default function App() {
 
       let 보스존추가 = 0
       const 기존보스존수 = currentMarines.filter(m => m.location === 'boss').length
-      const 기존사냥수 = currentMarines.filter(m => m.location === 'hunting').length
+      const 기존사냥1수 = currentMarines.filter(m => m.location === 'hunting1').length
+      const 기존사냥2수 = currentMarines.filter(m => m.location === 'hunting2').length
+      const 기존사냥3수 = currentMarines.filter(m => m.location === 'hunting3').length
+      let 사냥1추가 = 0, 사냥2추가 = 0, 사냥3추가 = 0
       const 판매수집: { lv: number }[] = []
       let 화면전환target: 화면 | null = null
 
@@ -1108,23 +1160,29 @@ export default function App() {
             return { ...m, state: 'idle', dest: null }
           }
         }
-        // 사냥터 입구 (cap = 사냥터캡)
+        // 사냥터 입구 (cap = 사냥터캡, 강도별 사냥터 1/2/3 자동 라우팅)
         if (점이구역안에(m.pos, ZONE_사냥터입구)) {
-          if (기존사냥수 + 사냥터추가 < 사냥터캡) {
+          const 목표loc: 유닛위치 = 사냥화면(m.lv)
+          const 기존수 = 목표loc === 'hunting1' ? 기존사냥1수 + 사냥1추가
+            : 목표loc === 'hunting2' ? 기존사냥2수 + 사냥2추가
+            : 기존사냥3수 + 사냥3추가
+          if (기존수 < 사냥터캡) {
             const 새m = {
               ...m,
-              location: 'hunting' as const,
-              pos: 사냥터시작위치(기존사냥수 + 사냥터추가),
+              location: 목표loc,
+              pos: 사냥터시작위치(기존수),
               state: 'idle' as 유닛상태,
               dest: null,
               타겟적id: null,
             }
-            사냥터추가++
-            if (!화면전환target) 화면전환target = 'hunting'
+            if (목표loc === 'hunting1') 사냥1추가++
+            else if (목표loc === 'hunting2') 사냥2추가++
+            else 사냥3추가++
+            if (!화면전환target) 화면전환target = 목표loc
             return 새m
           } else {
             if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 1500) {
-              메시지표시('🚫 사냥터 가득참')
+              메시지표시(`🚫 사냥터${목표loc.slice(-1)} 가득참 (${사냥터캡}/${사냥터캡})`)
             }
             return { ...m, state: 'idle', dest: null }
           }
@@ -1235,7 +1293,7 @@ export default function App() {
         }
 
         // 위치별 분기
-        if (n.location === 'hunting' || n.location === 'boss') {
+        if (is사냥터(n.location as 화면) || n.location === 'boss') {
           // 베이스 입구 체크 (서브 화면 → 베이스)
           if (점이구역안에(n.pos, ZONE_베이스입구)) {
             const 새m = {
@@ -1298,7 +1356,7 @@ export default function App() {
             return n
           }
           return n
-        } else if (n.location === 'hunting') {
+        } else if (is사냥터(n.location as 화면)) {
           // ========== 사냥터 마린 (미네랄 획득, 몹 처치) ==========
           const target = 몹들Ref.current.find(mb => mb.id === n.타겟적id && mb.deadUntil <= now)
 
@@ -1405,7 +1463,7 @@ export default function App() {
       // 자동 구입 (총 마린 200 미만일 때만)
       const 판매lv고정 = 자동판매ONRef.current ? 자동판매lvRef.current : 0
       const 총마린수예상 = currentMarines.length - 판매수집.length
-      if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 200 && 총마린수예상 < 200) {
+      if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 200) {
         const lv = 자동구입강도Ref.current
         const 판매충돌 = 판매lv고정 > 0 && lv === 판매lv고정
         if (!판매충돌) {
@@ -1424,7 +1482,7 @@ export default function App() {
 
       // 고유유닛 DPS 기여 (사냥터 배치 상시 적용)
       if (고유DPS > 0) {
-        const 고유티어 = 고유유닛스텟cur.위치2 ? 2 : 1
+        const 고유티어 = 고유유닛스텟cur.위치
         추가미네랄 += 고유DPS * 1.5 * 고유티어 * currentBatch * 자원배수기여 * dt
       }
       // 고유유닛 dest 보간 이동 (smooth)
@@ -1606,8 +1664,9 @@ export default function App() {
         set현재화면(화면전환target)
         if (화면전환target === 'boss') {
           메시지표시(`⚔️ 보스존 입장! (${기존보스존수 + 보스존추가}/${사냥터캡})`)
-        } else if (화면전환target === 'hunting') {
-          메시지표시(`🐺 사냥터 입장! (${기존사냥수 + 사냥터추가}마리)`)
+        } else if (is사냥터(화면전환target)) {
+          const t = 화면전환target.slice(-1)
+          메시지표시(`🐺 사냥터 ${t} 입장!`)
         }
       }
     }
@@ -1649,10 +1708,10 @@ export default function App() {
   // 사냥터 마린 전체 베이스로 복귀
   function 사냥터마린전체복귀() {
     set마린들(prev => {
-      const huntingList = prev.filter(m => m.location === 'hunting')
+      const huntingList = prev.filter(m => is사냥터(m.location as 화면))
       let baseIdx = prev.filter(m => m.location === 'base').length
       return prev.map(m => {
-        if (m.location !== 'hunting') return m
+        if (!is사냥터(m.location as 화면)) return m
         const pos = 베이스시작위치(baseIdx++)
         return { ...m, location: 'base' as const, pos, state: 'idle' as 유닛상태, dest: null, 타겟적id: null }
       })
@@ -1733,7 +1792,7 @@ export default function App() {
   }
 
   // 고유유닛 강화 (크레딧 사용)
-  const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치2'>, (lv: number) => number> = {
+  const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치'>, (lv: number) => number> = {
     공격력:   lv => (lv + 1) * 100,
     공속:     lv => (lv + 1) * 200,
     경험치:   lv => (lv + 1) * 150,
@@ -1741,10 +1800,10 @@ export default function App() {
     특수강화: lv => (lv + 1) * 250,
     파괴방지: lv => (lv + 1) * 50,
   }
-  const 고유유닛상한: Record<keyof Omit<고유유닛스텟, '위치2'>, number> = {
+  const 고유유닛상한: Record<keyof Omit<고유유닛스텟, '위치'>, number> = {
     공격력: 20, 공속: 6, 경험치: 5, 추가1강: 20, 특수강화: 10, 파괴방지: 200,
   }
-  function 고유유닛강화(stat: keyof Omit<고유유닛스텟, '위치2'>) {
+  function 고유유닛강화(stat: keyof Omit<고유유닛스텟, '위치'>) {
     const lv = 고유유닛Ref.current[stat] as number
     if (lv >= 고유유닛상한[stat]) { 메시지표시('MAX'); return }
     const 비용 = 고유유닛강화비용표[stat](lv)
@@ -1753,15 +1812,16 @@ export default function App() {
     set고유유닛(prev => ({ ...prev, [stat]: (prev[stat] as number) + 1 }))
   }
   function 고유유닛위치변경() {
-    if (!고유유닛Ref.current.위치2 && 크레딧Ref.current < 500) { 메시지표시('💰 크레딧 500 필요'); return }
-    if (!고유유닛Ref.current.위치2) set크레딧(prev => prev - 500)
-    set고유유닛(prev => ({ ...prev, 위치2: !prev.위치2 }))
+    const cur = 고유유닛Ref.current.위치
+    const next: 1 | 2 | 3 = cur === 1 ? 2 : cur === 2 ? 3 : 1
+    set고유유닛(prev => ({ ...prev, 위치: next }))
+    메시지표시(`📍 고유유닛 → 사냥터 ${next}`)
   }
 
 
   // 단순 화면 전환 (탭)
   function 베이스탭() { set현재화면('base'); set선택ID([]) }
-  function 사냥터탭() { set현재화면('hunting'); set선택ID([]) }
+  function 사냥터탭() { set현재화면('hunting1'); set선택ID([]) }
 
   // 판매소 zone 안 도달한 선택 마린 강제 판매 (수동)
   function 판매() {
@@ -1891,7 +1951,7 @@ export default function App() {
         const screen = 현재화면Ref.current
 
         // 0. 고유유닛 탭 체크 (사냥터 화면)
-        if (screen === 'hunting') {
+        if (is사냥터(screen)) {
           if (거리(end, 고유유닛posRef.current) < 마린_크기 / 2 + 10) {
             if (고유유닛선택Ref.current) {
               set고유유닛선택(false)
@@ -1933,7 +1993,7 @@ export default function App() {
           return
         }
         // 2. 선택O + 적 = 공격
-        if (선택IDRef.current.length > 0 && 적 && screen === 'hunting') {
+        if (선택IDRef.current.length > 0 && 적 && is사냥터(screen)) {
           공격명령(적.id)
           return
         }
@@ -2047,10 +2107,22 @@ export default function App() {
           <Text style={styles.tabText}>🏠 ({베이스마린들.length}) [{마린들.length}/200]</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, 현재화면 === 'hunting' && styles.tabActive]}
-          onPress={() => { set현재화면('hunting'); set선택ID([]) }}
+          style={[styles.tab, 현재화면 === 'hunting1' && styles.tabActive]}
+          onPress={() => { set현재화면('hunting1'); set선택ID([]) }}
         >
-          <Text style={styles.tabText}>🐺 사냥 ({사냥터마린들.length}/{사냥터캡})</Text>
+          <Text style={styles.tabText}>🏚️ 사1 ({사냥터1마린들.length})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, 현재화면 === 'hunting2' && styles.tabActive]}
+          onPress={() => { set현재화면('hunting2'); set선택ID([]) }}
+        >
+          <Text style={styles.tabText}>🏛️ 사2 ({사냥터2마린들.length})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, 현재화면 === 'hunting3' && styles.tabActive]}
+          onPress={() => { set현재화면('hunting3'); set선택ID([]) }}
+        >
+          <Text style={styles.tabText}>📡 사3 ({사냥터3마린들.length})</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, 현재화면 === 'boss' && styles.tabActiveRed]}
@@ -2129,7 +2201,7 @@ export default function App() {
       {/* 필드 (화면별 배경 이미지 + 단색 fallback + responder) */}
       <View style={[styles.field, {
         backgroundColor: 현재화면 === 'base' ? '#1a2a3e'
-          : 현재화면 === 'hunting' ? '#1a3e2a'
+          : is사냥터(현재화면) ? '#1a3e2a'
           : '#3e1a2a',
         // @ts-ignore - 웹: 필드 위에서 터치/휠 스크롤 막기
         ...(Platform.OS === 'web' ? { touchAction: 'none', overscrollBehavior: 'contain' } : {}),
@@ -2137,7 +2209,7 @@ export default function App() {
       {/* 배경 이미지 (절대 첫 자식, 터치 무시) */}
       <View style={{ position: 'absolute', top: 0, left: 0, width: 필드_W, height: 필드_H }} pointerEvents="none">
         <Image
-          source={현재화면 === 'base' ? BG_LOBBY : 현재화면 === 'hunting' ? BG_HUNTING : BG_BOSS}
+          source={현재화면 === 'base' ? BG_LOBBY : is사냥터(현재화면) ? BG_HUNTING : BG_BOSS}
           style={{ width: 필드_W, height: 필드_H, opacity: 0.55 }}
           resizeMode="cover"
         />
@@ -2169,7 +2241,7 @@ export default function App() {
         )}
 
         {/* HUNTING/BOSS: 베이스 비콘 */}
-        {(현재화면 === 'hunting' || 현재화면 === 'boss') && (
+        {(is사냥터(현재화면) || 현재화면 === 'boss') && (
           <View style={[styles.zone, {
             left: ZONE_베이스입구.x, top: ZONE_베이스입구.y,
             width: ZONE_베이스입구.w, height: ZONE_베이스입구.h,
@@ -2180,8 +2252,11 @@ export default function App() {
           </View>
         )}
 
-        {/* HUNTING: 사냥터 1/2/3 mob (각각 다른 강도 범위) */}
-        {현재화면 === 'hunting' && 몹들.map(mb => {
+        {/* HUNTING: 현재 화면 티어의 mob만 표시 */}
+        {is사냥터(현재화면) && 몹들.filter(mb => {
+          const screenTier = 현재화면 === 'hunting1' ? 1 : 현재화면 === 'hunting2' ? 2 : 3
+          return mb.티어 === screenTier
+        }).map(mb => {
           const flash = mb.flashUntil > now
           const 정보 = mb.티어 === 1
             ? { 이모지: '🏚️', 색: '#7ed957', 라벨: 'LV.1 (1~25강)', 크기: 80 }
@@ -2217,8 +2292,8 @@ export default function App() {
           )
         })}
 
-        {/* 고유유닛 (사냥터에 항상 배치) */}
-        {현재화면 === 'hunting' && (
+        {/* 고유유닛 (선택된 사냥터에만 배치) */}
+        {is사냥터(현재화면) && 현재화면 === `hunting${고유유닛.위치}` && (
           <View pointerEvents="none">
             {고유유닛선택 && (
               <View style={[styles.selectRing, {
@@ -2350,7 +2425,7 @@ export default function App() {
           <Text style={styles.zoneInfoText}>🔨 강화소 | ⚔️ 보스존 (최대 12) | 🐺 사냥터 (몹→💎) | 🛒 판매소</Text>
         </View>
       )}
-      {(현재화면 === 'hunting' || 현재화면 === 'boss') && (
+      {(is사냥터(현재화면) || 현재화면 === 'boss') && (
         <View style={styles.zoneInfo}>
           <Text style={styles.zoneInfoText}>🏠 베이스 비콘으로 마린 보내면 베이스 복귀</Text>
         </View>
@@ -2482,62 +2557,6 @@ export default function App() {
                 )}
               </>
             )}
-            <View style={styles.divider} />
-            <Text style={[styles.upgLabel, { color: '#e94560', marginBottom: 4 }]}>✨ 영구강화</Text>
-            <Text style={[styles.prodSubtitle, { marginBottom: 6 }]}>🔷무색조각 · 💠응무조 사용</Text>
-            {([
-              { key: '공격력', label: '⚔️ 공격력', 효과: '+3%/Lv', 통화: '무색' as const, 비용: (lv: number) => (lv + 1) * 500, max: 20 },
-              { key: '자원', label: '💰 자원 획득', 효과: '+5%/Lv', 통화: '무색' as const, 비용: (lv: number) => (lv + 1) * 800, max: 20 },
-              { key: '강화확률', label: '🎯 강화확률', 효과: '+0.5%p/Lv', 통화: '응무' as const, 비용: (lv: number) => (lv + 1) * 30, max: 20 },
-              { key: '이속', label: '💨 이동속도', 효과: '+3%/Lv', 통화: '응무' as const, 비용: (lv: number) => (lv + 1) * 20, max: 20 },
-              { key: '공속', label: '⚡ 공격속도', 효과: '+2%/Lv', 통화: '응무' as const, 비용: (lv: number) => (lv + 1) * 25, max: 20 },
-            ] as const).map(def => {
-              const lv = 업그레이드[def.key]
-              const maxed = lv >= def.max
-              const cost = maxed ? 0 : def.비용(lv)
-              const cur = def.통화 === '무색' ? 무색조각 : 응무조
-              const canBuy = !maxed && cur >= cost
-              const 통화기호 = def.통화 === '무색' ? '🔷' : '💠'
-              return (
-                <View key={def.key} style={styles.upgRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.upgLabel}>{def.label} <Text style={{ color: '#f5a623' }}>Lv.{lv}/{def.max}</Text></Text>
-                    <Text style={styles.upgEffect}>{def.효과} — 현재 {def.key === '공격력' ? `+${lv * 3}%` : def.key === '자원' ? `+${lv * 5}%` : def.key === '강화확률' ? `+${(lv * 0.5).toFixed(1)}%p` : def.key === '이속' ? `+${lv * 3}%` : `+${lv * 2}%`}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.upgBtn, !canBuy && styles.upgBtnOff, { minWidth: 70, paddingHorizontal: 6 }]}
-                    onPress={() => {
-                      if (!canBuy) return
-                      if (def.통화 === '무색') set무색조각(p => p - cost)
-                      else set응무조(p => p - cost)
-                      set업그레이드(prev => ({ ...prev, [def.key]: prev[def.key as keyof typeof prev] + 1 }))
-                      메시지표시(`✨ ${def.label} +1 → Lv.${lv + 1}`)
-                    }}
-                  >
-                    <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `${통화기호}${숫자포맷(cost)}`}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.upgBtn, { backgroundColor: canBuy ? '#7ed957' : '#444', minWidth: 46, paddingHorizontal: 4, marginLeft: 4 }]}
-                    onPress={() => {
-                      if (!canBuy) return
-                      let l = lv, spent = 0, count = 0
-                      while (l < def.max) {
-                        const c = def.비용(l)
-                        if (spent + c > cur) break
-                        spent += c; l++; count++
-                      }
-                      if (count === 0) return
-                      if (def.통화 === '무색') set무색조각(p => p - spent)
-                      else set응무조(p => p - spent)
-                      set업그레이드(prev => ({ ...prev, [def.key]: l }))
-                      메시지표시(`✨ ${def.label} +${count} → Lv.${l}`)
-                    }}
-                  >
-                    <Text style={[styles.upgBtnText, { color: canBuy ? '#000' : '#888' }]}>전체</Text>
-                  </TouchableOpacity>
-                </View>
-              )
-            })}
           </ScrollView>
         </View>
       )}
@@ -2757,7 +2776,7 @@ export default function App() {
       {/* 고유유닛 패널 */}
       {고유유닛패널열림 && (() => {
         const 고유DPS현재 = 고유유닛DPS(고유유닛)
-        const upgList: { stat: keyof Omit<고유유닛스텟, '위치2'>; 이모지: string; 설명: string; 상한: number }[] = [
+        const upgList: { stat: keyof Omit<고유유닛스텟, '위치'>; 이모지: string; 설명: string; 상한: number }[] = [
           { stat: '공격력',   이모지: '⚔️', 설명: '공격력 +500/강화 (기본500)',         상한: 20 },
           { stat: '공속',     이모지: '⚡', 설명: '공격속도 단계 (1→1.5→2→2.5→3→3.5→4)', 상한: 6 },
           { stat: '경험치',   이모지: '📗', 설명: '경험치 획득 +20%/강화',               상한: 5 },
@@ -2778,7 +2797,7 @@ export default function App() {
               DPS {숫자포맷(고유DPS현재)} (공격력 {고유유닛공격력(고유유닛)} × 속도 {고유유닛공속(고유유닛).toFixed(1)})
             </Text>
             <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
-              위치: {고유유닛.위치2 ? '사냥터2 (×2배)' : '사냥터1 (×1배)'}
+              위치: 사냥터 {고유유닛.위치} (×{고유유닛.위치}배)
             </Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {upgList.map(({ stat, 이모지, 설명, 상한 }) => {
@@ -2804,14 +2823,14 @@ export default function App() {
               <View style={styles.divider} />
               <View style={styles.upgRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.upgLabel}>📍 위치 변경 <Text style={{ color: '#f5a623' }}>{고유유닛.위치2 ? '사냥터2' : '사냥터1'}</Text></Text>
-                  <Text style={styles.upgEffect}>{고유유닛.위치2 ? '사냥터1로 이동 (무료)' : '사냥터2 배치 (💰500)'}</Text>
+                  <Text style={styles.upgLabel}>📍 위치 변경 <Text style={{ color: '#f5a623' }}>사냥터{고유유닛.위치}</Text></Text>
+                  <Text style={styles.upgEffect}>탭하여 다음 사냥터로 (사1→2→3→1)</Text>
                 </View>
                 <TouchableOpacity
-                  style={[styles.upgBtn, { backgroundColor: (!고유유닛.위치2 && 크레딧 < 500) ? '#444' : '#4a90e2' }]}
+                  style={[styles.upgBtn, { backgroundColor: '#4a90e2' }]}
                   onPress={고유유닛위치변경}
                 >
-                  <Text style={styles.upgBtnText}>{고유유닛.위치2 ? '↩사냥터1' : '💰500'}</Text>
+                  <Text style={styles.upgBtnText}>→ 사{고유유닛.위치 === 1 ? 2 : 고유유닛.위치 === 2 ? 3 : 1}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
