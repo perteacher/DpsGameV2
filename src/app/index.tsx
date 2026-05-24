@@ -71,7 +71,10 @@ type 강화스텟 = {
 // 강화 시도 — 스텟 적용 버전
 // 반환: 0=실패, 1=+1, 2=+2, 3=+3
 // 외부p1: 보주/크리스탈/영구강화에서 오는 추가 성공확률 (0~1 소수)
-function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0): number {
+// 보석p: 레벨별 보석 추가 확률
+type 보석p타입 = { add44: number; add45: number; add46: number; add47: number; add48: number }
+const 빈보석p: 보석p타입 = { add44: 0, add45: 0, add46: 0, add47: 0, add48: 0 }
+function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0, 보석p: 보석p타입 = 빈보석p): number {
   if (단계 >= 50) return 0  // 초월 시스템 별도
   const r = Math.random()
   const base = 강화확률표[단계] ?? 0
@@ -82,13 +85,14 @@ function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0
   }
   // 48강: 개별확률 0% → 스텟 보너스만
   if (단계 === 48) {
-    const bonus = 스텟.가산48강 * 0.0005 + 외부p1
+    const bonus = 스텟.가산48강 * 0.0005 + 외부p1 + 보석p.add48
     return r < Math.min(0.95, bonus) ? 1 : 0
   }
-  // 44~47강: 개별확률 + 스텟 + 외부보너스
+  // 44~47강: 개별확률 + 스텟 + 외부보너스 + 보석
   if (단계 >= 44 && 단계 <= 47) {
     const lvBonus = [스텟.가산44강, 스텟.가산45강, 스텟.가산46강, 스텟.가산47강][단계 - 44] * 0.001
-    return r < Math.min(0.95, base + lvBonus + 외부p1) ? 1 : 0
+    const 보석추가 = [보석p.add44, 보석p.add45, 보석p.add46, 보석p.add47][단계 - 44]
+    return r < Math.min(0.95, base + lvBonus + 외부p1 + 보석추가) ? 1 : 0
   }
   // 40~43강: 특수 확률 (기본 0%, 스텟 보너스만 — 외부보너스 미적용)
   if (단계 >= 40 && 단계 <= 43) {
@@ -323,6 +327,51 @@ const 초기명칭크리스탈: 명칭크리스탈목록 = {
   창조O: 0, 파멸O: 0,
 }
 
+// 보석 시스템 (12종, 무색조각으로 구입)
+type 보석타입 = '하급' | '중급' | '상급' | '특급' | '고급' | '재물' | '경험보석' | '보호보석' | '궁극' | '수호' | '초월보석' | '인내'
+type 보석목록 = { [K in 보석타입]: number }
+const 초기보석: 보석목록 = { 하급: 0, 중급: 0, 상급: 0, 특급: 0, 고급: 0, 재물: 0, 경험보석: 0, 보호보석: 0, 궁극: 0, 수호: 0, 초월보석: 0, 인내: 0 }
+
+const 보석구입비용: Record<보석타입, number> = {
+  하급: 100, 중급: 300, 상급: 500, 특급: 1000, 고급: 2000,
+  재물: 200, 경험보석: 200, 보호보석: 500, 궁극: 1000, 수호: 500, 초월보석: 1000, 인내: 2000,
+}
+
+function 보석보너스합산(b: 보석목록) {
+  // 강화확률 추가 (decimal, 0~1)
+  const add44 = b.하급 * 0.001 + b.궁극 * 0.0001 + b.초월보석 * 0.0001
+  const add45 = b.중급 * 0.001 + b.궁극 * 0.0001 + b.초월보석 * 0.0001
+  const add46 = b.상급 * 0.001 + b.궁극 * 0.0001 + b.초월보석 * 0.0001
+  const add47 = b.특급 * 0.001 + b.궁극 * 0.0001 + b.초월보석 * 0.0001
+  const add48 = b.고급 * 0.0005 + b.초월보석 * 0.0001
+  // 파괴방지 (points, 10 points = 1%)
+  const 파괴방지 = b.보호보석 * 1 + b.수호 * 0.1
+  // 자원/경험/초월 배수
+  const 자원배수추가 = b.재물 * 0.1
+  const 경험배수 = 1 + b.경험보석 * 0.1
+  const 초월확률추가 = b.인내 * 0.00001  // 0.001% per gem
+  return { add44, add45, add46, add47, add48, 파괴방지, 자원배수추가, 경험배수, 초월확률추가 }
+}
+
+// 고유유닛 업그레이드 스텟
+type 고유유닛스텟 = {
+  공격력: number   // 0~20, 강화당 공격력 +500
+  공속: number     // 0~6, 공격속도 단계
+  경험치: number   // 0~5, 강화당 경험치 +20%
+  추가1강: number  // 0~20, 강화당 +1강 확률 +0.25%
+  특수강화: number // 0~10, 강화당 특수강화 확률 +0.5%
+  위치2: boolean   // false=사냥터1, true=사냥터2
+  파괴방지: number // 0~200, 강화당 파괴방지 +0.1%
+}
+const 초기고유유닛: 고유유닛스텟 = { 공격력: 0, 공속: 0, 경험치: 0, 추가1강: 0, 특수강화: 0, 위치2: false, 파괴방지: 0 }
+
+function 고유유닛공격력(스텟: 고유유닛스텟) { return 500 + 스텟.공격력 * 500 }
+function 고유유닛공속(스텟: 고유유닛스텟): number {
+  const tbl = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+  return tbl[Math.min(스텟.공속, 6)]
+}
+function 고유유닛DPS(스텟: 고유유닛스텟) { return 고유유닛공격력(스텟) * 고유유닛공속(스텟) }
+
 // ============================================
 // 유틸
 // ============================================
@@ -545,6 +594,17 @@ export default function App() {
   const [명칭크리스탈, set명칭크리스탈] = useState<명칭크리스탈목록>(() => ({ ...초기명칭크리스탈 }))
   const [명칭크리스탈패널열림, set명칭크리스탈패널열림] = useState(false)
   const [명칭크리스탈탭, set명칭크리스탈탭] = useState<'노말' | '레어' | '유니크' | '갤럭시' | '퀘이사' | '오리진'>('노말')
+  // 크레딧 (보스 처치 보상, 고유유닛 강화에 사용)
+  const [크레딧, set크레딧] = useState(0)
+  // 보석
+  const [보석, set보석] = useState<보석목록>(() => ({ ...초기보석 }))
+  const [보석패널열림, set보석패널열림] = useState(false)
+  // 고유유닛
+  const [고유유닛, set고유유닛] = useState<고유유닛스텟>(() => ({ ...초기고유유닛 }))
+  const [고유유닛패널열림, set고유유닛패널열림] = useState(false)
+  // 초월레벨
+  const [초월레벨, set초월레벨] = useState(0)
+  const [초월잔여포인트, set초월잔여포인트] = useState(0)
   // 영구강화 (무색조각/응무조 사용)
   const [업그레이드, set업그레이드] = useState({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
   // 패널
@@ -592,6 +652,11 @@ export default function App() {
   const 일반스텟Ref = useRef(일반스텟); 일반스텟Ref.current = 일반스텟
   const 초월스텟Ref = useRef(초월스텟); 초월스텟Ref.current = 초월스텟
   const 명칭크리스탈Ref = useRef(명칭크리스탈); 명칭크리스탈Ref.current = 명칭크리스탈
+  const 크레딧Ref = useRef(크레딧); 크레딧Ref.current = 크레딧
+  const 보석Ref = useRef(보석); 보석Ref.current = 보석
+  const 고유유닛Ref = useRef(고유유닛); 고유유닛Ref.current = 고유유닛
+  const 초월레벨Ref = useRef(초월레벨); 초월레벨Ref.current = 초월레벨
+  const 초월잔여포인트Ref = useRef(초월잔여포인트); 초월잔여포인트Ref.current = 초월잔여포인트
   const 업그레이드Ref = useRef(업그레이드); 업그레이드Ref.current = 업그레이드
   const 자동강화ONRef = useRef(자동강화ON); 자동강화ONRef.current = 자동강화ON
   const 자동강화최대lvRef = useRef(자동강화최대lv); 자동강화최대lvRef.current = 자동강화최대lv
@@ -689,6 +754,11 @@ export default function App() {
           if (d.일반스텟 && typeof d.일반스텟 === 'object') set일반스텟(prev => ({ ...prev, ...d.일반스텟 }))
           if (d.초월스텟 && typeof d.초월스텟 === 'object') set초월스텟(prev => ({ ...prev, ...d.초월스텟 }))
           if (d.명칭크리스탈 && typeof d.명칭크리스탈 === 'object') set명칭크리스탈(prev => ({ ...prev, ...d.명칭크리스탈 }))
+          if (typeof d.크레딧 === 'number') set크레딧(d.크레딧)
+          if (d.보석 && typeof d.보석 === 'object') set보석(prev => ({ ...prev, ...d.보석 }))
+          if (d.고유유닛 && typeof d.고유유닛 === 'object') set고유유닛(prev => ({ ...prev, ...d.고유유닛 }))
+          if (typeof d.초월레벨 === 'number') set초월레벨(d.초월레벨)
+          if (typeof d.초월잔여포인트 === 'number') set초월잔여포인트(d.초월잔여포인트)
           // 오프라인 보상
           if (typeof d.마지막저장시간 === 'number' && d.마지막저장시간 > 0) {
             const 경과초 = Math.min(8 * 3600, (Date.now() - d.마지막저장시간) / 1000)
@@ -721,6 +791,7 @@ export default function App() {
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈,
+      크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON,
       마지막저장시간: Date.now(),
@@ -731,6 +802,7 @@ export default function App() {
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈,
+      크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON, 로드완료])
 
@@ -776,9 +848,13 @@ export default function App() {
       const 크리집중 = 크리스탈합산(eqCr, invCr, '집중')
       const 크리길운 = 크리스탈합산(eqCr, invCr, '길운')
       const 명칭보너스 = 명칭크리스탈보너스(명칭크리스탈Ref.current)
+      const 보석b = 보석보너스합산(보석Ref.current)
+      const 고유유닛스텟cur = 고유유닛Ref.current
+      const 고유DPS = 고유유닛DPS(고유유닛스텟cur)
+      const 초월lv = 초월레벨Ref.current
       const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05) * (1 + 크리집중)
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
-      const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03) * (1 + 보주배수)
+      const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
       const 속도 = Math.min(450, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
       const 보스존캡 = 8
       const 사냥터캡 = 8 + 보스처치수Ref.current * 4
@@ -892,8 +968,22 @@ export default function App() {
               state: 'idle' as 유닛상태,
               dest: null,
             }
-            const 외부강화보너스 = 보주강화 + 크리길운 + upg.강화확률 * 0.005 + 명칭보너스.개별확률
-            const 증가 = 강화시도(m.lv, 스텟, 외부강화보너스)
+            const 외부강화보너스 = 보주강화 + 크리길운 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005
+            // 50강 → 51강 초월 시도
+            if (m.lv === 50) {
+              const 초월p = (초월스텟Ref.current.추가초월확률 + 명칭보너스.초월확률 + 초월lv) * 0.00001 + 보석b.초월확률추가
+              const 초월성공 = Math.random() < Math.min(0.95, 초월p)
+              if (초월성공) {
+                새m.lv = 51
+                set초월레벨(p => p + 1)
+                set초월잔여포인트(p => p + 1)
+                set누적강화성공(p => p + 1)
+                set최고마린lv(p => Math.max(p, 51))
+                메시지표시('✨ 초월 성공! 51강 달성!')
+              }
+              return 새m
+            }
+            const 증가 = m.lv < 50 ? 강화시도(m.lv, 스텟, 외부강화보너스, 보석b) : 0
             if (증가 > 0) {
               // 성공 (+1강 / +2강 / +3강)
               새m.lv = m.lv + 증가
@@ -901,7 +991,7 @@ export default function App() {
               set최고마린lv(p => Math.max(p, 새m.lv))
             } else {
               // 실패 페널티
-              const r = 강화실패결과(m.lv, 스텟.특수파괴방지 + 스텟.특수파괴방지2 + 명칭보너스.파괴방지)
+              const r = 강화실패결과(m.lv, 스텟.특수파괴방지 + 스텟.특수파괴방지2 + 명칭보너스.파괴방지 + 보석b.파괴방지 + 고유유닛스텟cur.파괴방지)
               if (r.파괴) {
                 if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 1000) {
                   메시지표시(`💥 ${m.lv}강 마린 파괴!`)
@@ -1010,7 +1100,9 @@ export default function App() {
               n.공격플래시Until = now + 150
               const isCrit = Math.random() < 평균크리
               const dmg = 공격력(n.lv) * 공격력배수 * (isCrit ? 2 : 1)
-              추가미네랄 += dmg * currentBatch * 자원배수기여
+              // 사냥터 공격력 +50% + 티어 배수 (1~25강=×1, 26~40강=×2, 41+강=×4)
+              const 사냥터티어 = n.lv <= 25 ? 1 : n.lv <= 40 ? 2 : 4
+              추가미네랄 += dmg * 1.5 * 사냥터티어 * currentBatch * 자원배수기여
               추가공격수 += 1
               플래시몹.push(target.id)
               몹데미지맵.set(target.id, (몹데미지맵.get(target.id) ?? 0) + dmg)
@@ -1107,6 +1199,12 @@ export default function App() {
         }
       }
 
+      // 고유유닛 DPS 기여 (사냥터 배치 상시 적용)
+      if (고유DPS > 0) {
+        const 고유티어 = 고유유닛스텟cur.위치2 ? 2 : 1
+        추가미네랄 += 고유DPS * 1.5 * 고유티어 * currentBatch * 자원배수기여 * dt
+      }
+
       // currency 업데이트
       if (잔여Mineral !== currentMineral) setMineral(잔여Mineral + 추가미네랄)
       else if (추가미네랄 > 0) setMineral(prev => prev + 추가미네랄)
@@ -1162,6 +1260,8 @@ export default function App() {
         set크리스탈조각(prev => prev + 조각드랍)
         // 보스 처치 XP: 보스번호 * 200
         XP획득((baseN + 1) * 200)
+        // 크레딧 보상
+        set크레딧(prev => prev + 10 + baseN * 5)
         // 보주 드랍 (50%)
         if (Math.random() < 0.5) {
           const 종류 = 보주종류목록[Math.floor(Math.random() * 보주종류목록.length)]
@@ -1234,7 +1334,8 @@ export default function App() {
 
   // XP 획득 → 레벨업 처리
   function XP획득(amount: number) {
-    let xp = 경험치Ref.current + Math.round(amount)
+    const 경험배수 = 보석보너스합산(보석Ref.current).경험배수
+    let xp = 경험치Ref.current + Math.round(amount * 경험배수)
     let lv = 캐릭레벨Ref.current
     let pts = 잔여포인트Ref.current
     const startLv = lv
@@ -1255,12 +1356,46 @@ export default function App() {
     set잔여포인트(p => p - amount)
     set일반스텟(prev => ({ ...prev, [stat]: prev[stat] + amount }))
   }
-  // 스탯 포인트 분배 (초월 스텟, Lv 300,000 이상 필요)
+  // 스탯 포인트 분배 (초월 스텟, 초월잔여포인트 사용)
   function 초월스탯올리기(stat: keyof typeof 초월스텟, amount = 1) {
-    if (잔여포인트Ref.current < amount) return
-    if (캐릭레벨Ref.current < 300000) { 메시지표시('⛔ 초월 스텟은 Lv.300,000 이상 필요'); return }
-    set잔여포인트(p => p - amount)
+    if (초월잔여포인트Ref.current < amount) { 메시지표시('⛔ 초월 포인트 부족 (51강 달성 시 획득)'); return }
+    set초월잔여포인트(p => p - amount)
     set초월스텟(prev => ({ ...prev, [stat]: prev[stat] + amount }))
+  }
+
+  // 보석 구입 (무색조각 사용)
+  function 보석구입(종류: 보석타입) {
+    const 비용 = 보석구입비용[종류]
+    if (무색조각Ref.current < 비용) { 메시지표시(`🔷 무색조각 ${숫자포맷(비용)} 필요`); return }
+    set무색조각(prev => prev - 비용)
+    set보석(prev => ({ ...prev, [종류]: prev[종류] + 1 }))
+    메시지표시(`💎 ${종류} 보석 구입!`)
+  }
+
+  // 고유유닛 강화 (크레딧 사용)
+  const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치2'>, (lv: number) => number> = {
+    공격력:   lv => (lv + 1) * 100,
+    공속:     lv => (lv + 1) * 200,
+    경험치:   lv => (lv + 1) * 150,
+    추가1강:  lv => (lv + 1) * 80,
+    특수강화: lv => (lv + 1) * 250,
+    파괴방지: lv => (lv + 1) * 50,
+  }
+  const 고유유닛상한: Record<keyof Omit<고유유닛스텟, '위치2'>, number> = {
+    공격력: 20, 공속: 6, 경험치: 5, 추가1강: 20, 특수강화: 10, 파괴방지: 200,
+  }
+  function 고유유닛강화(stat: keyof Omit<고유유닛스텟, '위치2'>) {
+    const lv = 고유유닛Ref.current[stat] as number
+    if (lv >= 고유유닛상한[stat]) { 메시지표시('MAX'); return }
+    const 비용 = 고유유닛강화비용표[stat](lv)
+    if (크레딧Ref.current < 비용) { 메시지표시(`💰 크레딧 ${비용} 필요`); return }
+    set크레딧(prev => prev - 비용)
+    set고유유닛(prev => ({ ...prev, [stat]: (prev[stat] as number) + 1 }))
+  }
+  function 고유유닛위치변경() {
+    if (!고유유닛Ref.current.위치2 && 크레딧Ref.current < 500) { 메시지표시('💰 크레딧 500 필요'); return }
+    if (!고유유닛Ref.current.위치2) set크레딧(prev => prev - 500)
+    set고유유닛(prev => ({ ...prev, 위치2: !prev.위치2 }))
   }
 
   // 명칭 크리스탈 구입
@@ -1467,8 +1602,14 @@ export default function App() {
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
     set초월스텟({ 추가초월확률: 0 })
     set명칭크리스탈({ ...초기명칭크리스탈 })
+    set크레딧(0)
+    set보석({ ...초기보석 })
+    set고유유닛({ ...초기고유유닛 })
+    set초월레벨(0)
+    set초월잔여포인트(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1)
     set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
+    set보석패널열림(false); set고유유닛패널열림(false)
     set몹들(초기몹들())
     set자동강화ON(false); set자동강화최대lv(1)
     set자동판매ON(false); set자동판매lv(50)
@@ -1512,6 +1653,8 @@ export default function App() {
           <Text style={styles.statSmall}>📈 {숫자포맷(시간당미네랄)}/h</Text>
           <Text style={styles.statSmall}>🔮 {숫자포맷(크리스탈조각)}</Text>
           <Text style={[styles.statSmall, { color: 잔여포인트 > 0 ? '#f5a623' : '#aaa' }]}>Lv.{캐릭레벨}{잔여포인트 > 0 ? ` (+${잔여포인트}P)` : ''}</Text>
+          {초월레벨 > 0 && <Text style={[styles.statSmall, { color: '#a855f7' }]}>🌀초월Lv.{초월레벨}{초월잔여포인트 > 0 ? ` (+${초월잔여포인트}P)` : ''}</Text>}
+          {크레딧 > 0 && <Text style={[styles.statSmall, { color: '#f5a623' }]}>💰 {숫자포맷(크레딧)}크레딧</Text>}
         </View>
       </View>
 
@@ -1541,39 +1684,51 @@ export default function App() {
       <View style={styles.smallBtnBar}>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !생산패널열림
-          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
+          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🏭 생산</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !자동패널열림
-          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
+          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🤖 자동</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !강화패널열림
-          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set명칭크리스탈패널열림(false) }
+          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>✨ 강화</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !보주패널열림
-          set보주패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
+          set보주패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>⚔️ 보주 ({장착보주.length}/3)</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !크리스탈패널열림
-          set크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
+          set크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>💎 크리 ({장착크리스탈.length}/3)</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !명칭크리스탈패널열림
-          set명칭크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false) }
+          set명칭크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🌟 명칭</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.smallBtn} onPress={() => {
+          const v = !보석패널열림
+          set보석패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false) }
+        }}>
+          <Text style={styles.smallBtnText}>💎 보석</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.smallBtn} onPress={() => {
+          const v = !고유유닛패널열림
+          set고유유닛패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
+        }}>
+          <Text style={styles.smallBtnText}>🦸 고유({크레딧})</Text>
         </TouchableOpacity>
       </View>
 
@@ -1798,7 +1953,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.prodSubtitle}>Lv.{캐릭레벨} · XP {경험치}/{다음경험치(캐릭레벨)} · 포인트 {잔여포인트}</Text>
+          <Text style={styles.prodSubtitle}>Lv.{캐릭레벨} · XP {경험치}/{다음경험치(캐릭레벨)} · 포인트 {잔여포인트} · 초월포인트 {초월잔여포인트}</Text>
           {/* 스텟 탭 */}
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
             <TouchableOpacity
@@ -1856,31 +2011,36 @@ export default function App() {
             {/* 초월 스텟 */}
             {스텟탭 === '초월' && (
               <>
-                {캐릭레벨 < 300000 ? (
-                  <Text style={{ color: '#e94560', textAlign: 'center', padding: 16, fontSize: 13 }}>
-                    🔒 초월 스텟은 Lv.300,000 이상 필요{'\n'}현재 Lv.{캐릭레벨.toLocaleString()}
+                {초월레벨 === 0 ? (
+                  <Text style={{ color: '#a855f7', textAlign: 'center', padding: 16, fontSize: 13 }}>
+                    🔒 초월 스텟은 51강 달성 시 초월 포인트를 획득합니다{'\n'}현재 초월레벨: {초월레벨} (포인트: {초월잔여포인트})
                   </Text>
                 ) : (
                   (() => {
-                    const canUp = 잔여포인트 > 0
+                    const canUp = 초월잔여포인트 > 0
                     const 초월목록: { key: keyof typeof 초월스텟; label: string; 효과: string }[] = [
                       { key: '추가초월확률', label: '🌀 추가 초월확률', 효과: `+${(초월스텟.추가초월확률 * 0.001).toFixed(3)}%` },
                     ]
-                    return 초월목록.map(({ key, label, 효과 }) => {
-                      const val = 초월스텟[key]
-                      return (
-                        <View key={key} style={styles.statRow2}>
-                          <Text style={styles.statLabel}>{label}</Text>
-                          <Text style={styles.statVal}>{val} <Text style={{ color: '#aaa', fontSize: 9 }}>({효과})</Text></Text>
-                          <TouchableOpacity style={[styles.statBtn, !canUp && styles.statBtnOff]} onPress={() => 초월스탯올리기(key)}>
-                            <Text style={styles.statBtnText}>+</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[styles.statBtn, { backgroundColor: canUp ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 초월스탯올리기(key, 잔여포인트)}>
-                            <Text style={[styles.statBtnText, { color: canUp ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )
-                    })
+                    return (
+                      <>
+                        <Text style={{ color: '#a855f7', fontSize: 11, marginBottom: 6 }}>🌀 초월레벨 {초월레벨} · 초월 포인트 {초월잔여포인트}</Text>
+                        {초월목록.map(({ key, label, 효과 }) => {
+                          const val = 초월스텟[key]
+                          return (
+                            <View key={key} style={styles.statRow2}>
+                              <Text style={styles.statLabel}>{label}</Text>
+                              <Text style={styles.statVal}>{val} <Text style={{ color: '#aaa', fontSize: 9 }}>({효과})</Text></Text>
+                              <TouchableOpacity style={[styles.statBtn, !canUp && styles.statBtnOff]} onPress={() => 초월스탯올리기(key)}>
+                                <Text style={styles.statBtnText}>+</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={[styles.statBtn, { backgroundColor: canUp ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 초월스탯올리기(key, 초월잔여포인트)}>
+                                <Text style={[styles.statBtnText, { color: canUp ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )
+                        })}
+                      </>
+                    )
                   })()
                 )}
               </>
@@ -2182,6 +2342,121 @@ export default function App() {
                   </View>
                 )
               })}
+            </ScrollView>
+          </View>
+        )
+      })()}
+
+      {/* 보석 패널 */}
+      {보석패널열림 && (() => {
+        const 보석정보: { 종류: 보석타입; 이모지: string; 설명: string; 효과: string }[] = [
+          { 종류: '하급',    이모지: '🔸', 설명: '하급 강화의 보석',  효과: `44강 +${(보석.하급 * 0.1).toFixed(1)}% (회당+0.1%)` },
+          { 종류: '중급',    이모지: '🔶', 설명: '중급 강화의 보석',  효과: `45강 +${(보석.중급 * 0.1).toFixed(1)}% (회당+0.1%)` },
+          { 종류: '상급',    이모지: '💠', 설명: '상급 강화의 보석',  효과: `46강 +${(보석.상급 * 0.1).toFixed(1)}% (회당+0.1%)` },
+          { 종류: '특급',    이모지: '🔷', 설명: '특급 강화의 보석',  효과: `47강 +${(보석.특급 * 0.1).toFixed(1)}% (회당+0.1%)` },
+          { 종류: '고급',    이모지: '💎', 설명: '고급 강화의 보석',  효과: `48강 +${(보석.고급 * 0.05).toFixed(2)}% (회당+0.05%)` },
+          { 종류: '재물',    이모지: '💰', 설명: '재물의 보석',       효과: `자원 +${(보석.재물 * 10).toFixed(0)}% (회당+10%)` },
+          { 종류: '경험보석',이모지: '📗', 설명: '경험의 보석',       효과: `경험치 +${(보석.경험보석 * 10).toFixed(0)}% (회당+10%)` },
+          { 종류: '보호보석',이모지: '🛡️', 설명: '보호의 보석',       효과: `파괴방지 +${보석.보호보석 * 0.1}% (회당+0.1%)` },
+          { 종류: '궁극',    이모지: '🌟', 설명: '궁극 강화의 보석',  효과: `44~47강 각 +${(보석.궁극 * 0.01).toFixed(2)}% (회당+0.01%)` },
+          { 종류: '수호',    이모지: '🔮', 설명: '수호의 보석',       효과: `파괴방지 +${(보석.수호 * 0.01).toFixed(2)}% (회당+0.01%)` },
+          { 종류: '초월보석',이모지: '✨', 설명: '초월 강화의 보석',  효과: `44~48강 각 +${(보석.초월보석 * 0.01).toFixed(2)}% (회당+0.01%)` },
+          { 종류: '인내',    이모지: '🌀', 설명: '인내의 보석',       효과: `51강확률 +${(보석.인내 * 0.001).toFixed(3)}% (회당+0.001%)` },
+        ]
+        return (
+          <View style={styles.prodPanel}>
+            <View style={styles.prodHeader}>
+              <Text style={styles.prodTitle}>💎 보석 ({Object.values(보석).reduce((s, v) => s + v, 0)}개 보유)</Text>
+              <TouchableOpacity onPress={() => set보석패널열림(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.prodSubtitle}>🔷 무색조각: {숫자포맷(무색조각)} · 탭=구입</Text>
+            <ScrollView style={{ maxHeight: 340 }}>
+              {보석정보.map(({ 종류, 이모지, 설명, 효과 }) => {
+                const 비용 = 보석구입비용[종류]
+                const 보유수 = 보석[종류]
+                const ok = 무색조각 >= 비용
+                return (
+                  <View key={종류} style={styles.upgRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.upgLabel}>{이모지} {설명} <Text style={{ color: '#f5a623' }}>×{보유수}</Text></Text>
+                      <Text style={styles.upgEffect}>{효과}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 70 }]}
+                      onPress={() => 보석구입(종류)}
+                    >
+                      <Text style={styles.upgBtnText}>🔷{숫자포맷(비용)}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )
+      })()}
+
+      {/* 고유유닛 패널 */}
+      {고유유닛패널열림 && (() => {
+        const 고유DPS현재 = 고유유닛DPS(고유유닛)
+        const upgList: { stat: keyof Omit<고유유닛스텟, '위치2'>; 이모지: string; 설명: string; 상한: number }[] = [
+          { stat: '공격력',   이모지: '⚔️', 설명: '공격력 +500/강화 (기본500)',         상한: 20 },
+          { stat: '공속',     이모지: '⚡', 설명: '공격속도 단계 (1→1.5→2→2.5→3→3.5→4)', 상한: 6 },
+          { stat: '경험치',   이모지: '📗', 설명: '경험치 획득 +20%/강화',               상한: 5 },
+          { stat: '추가1강',  이모지: '🎯', 설명: '+1강 확률 +0.25%/강화',               상한: 20 },
+          { stat: '특수강화', 이모지: '🌟', 설명: '특수강화 확률 +0.5%/강화',            상한: 10 },
+          { stat: '파괴방지', 이모지: '🛡️', 설명: '파괴방지 +0.1%/강화',               상한: 200 },
+        ]
+        return (
+          <View style={styles.prodPanel}>
+            <View style={styles.prodHeader}>
+              <Text style={styles.prodTitle}>🦸 고유유닛 강화</Text>
+              <TouchableOpacity onPress={() => set고유유닛패널열림(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.prodSubtitle}>💰 크레딧: {숫자포맷(크레딧)} · 보스 처치 시 획득</Text>
+            <Text style={[styles.prodSubtitle, { color: '#7ed957' }]}>
+              DPS {숫자포맷(고유DPS현재)} (공격력 {고유유닛공격력(고유유닛)} × 속도 {고유유닛공속(고유유닛).toFixed(1)})
+            </Text>
+            <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
+              위치: {고유유닛.위치2 ? '사냥터2 (×2배)' : '사냥터1 (×1배)'}
+            </Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {upgList.map(({ stat, 이모지, 설명, 상한 }) => {
+                const lv = 고유유닛[stat] as number
+                const maxed = lv >= 상한
+                const 비용 = maxed ? 0 : 고유유닛강화비용표[stat](lv)
+                const ok = !maxed && 크레딧 >= 비용
+                return (
+                  <View key={stat} style={styles.upgRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.upgLabel}>{이모지} {stat} <Text style={{ color: '#f5a623' }}>Lv.{lv}/{상한}</Text></Text>
+                      <Text style={styles.upgEffect}>{설명}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 70 }]}
+                      onPress={() => 고유유닛강화(stat)}
+                    >
+                      <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `💰${숫자포맷(비용)}`}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              })}
+              <View style={styles.divider} />
+              <View style={styles.upgRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.upgLabel}>📍 위치 변경 <Text style={{ color: '#f5a623' }}>{고유유닛.위치2 ? '사냥터2' : '사냥터1'}</Text></Text>
+                  <Text style={styles.upgEffect}>{고유유닛.위치2 ? '사냥터1로 이동 (무료)' : '사냥터2 배치 (💰500)'}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.upgBtn, { backgroundColor: (!고유유닛.위치2 && 크레딧 < 500) ? '#444' : '#4a90e2' }]}
+                  onPress={고유유닛위치변경}
+                >
+                  <Text style={styles.upgBtnText}>{고유유닛.위치2 ? '↩사냥터1' : '💰500'}</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         )
