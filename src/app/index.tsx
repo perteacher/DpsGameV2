@@ -190,9 +190,14 @@ function 다음경험치(lv: number): number {
   return Math.round(100 * Math.pow(1.35, lv - 1))
 }
 
-// 생산 비용 (1~11강)
+const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32] as const
+const 생산비용표: Record<number, number> = {
+  1: 1500, 7: 40000, 11: 700000, 15: 8000000,
+  18: 100000000, 20: 600000000, 22: 3500000000, 24: 20000000000,
+  26: 100000000000, 28: 600000000000, 30: 3500000000000, 32: 20000000000000,
+}
 function 생산비용(강도: number): number {
-  return Math.round(10 * Math.pow(4, 강도 - 1))
+  return 생산비용표[강도] ?? Number.MAX_SAFE_INTEGER
 }
 
 // 판매 보상 (원본 맵 기반: 41강+ 크리스탈조각 드랍)
@@ -295,11 +300,6 @@ type 구역 = { x: number; y: number; w: number; h: number; label: string; color
 type 보주타입 = '신위' | '절명' | '풍요' | '영겁' | '명운' | '성운' | '천운' | '무위' | '풍성' | '인연' | '폭식' | '공명'
 type 보주 = { id: number; 종류: 보주타입; 등급: number }  // 등급 1-5
 const 보주종류목록: 보주타입[] = ['신위', '절명', '풍요', '영겁', '명운', '성운', '천운', '무위', '풍성', '인연', '폭식', '공명']
-
-// 크리스탈 (6종 — 크리스탈조각으로 구입, 3슬롯 장착)
-type 크리스탈타입 = '증식' | '길운' | '집중' | '백색' | '절제' | '경험'
-type 크리스탈 = { id: number; 종류: 크리스탈타입; 등급: number }  // 등급 1=노말/2=레어/3=유니크
-const 크리스탈종류목록: 크리스탈타입[] = ['증식', '길운', '집중', '백색', '절제', '경험']
 
 // 명칭 크리스탈 (누적 수집형, 패시브 보너스)
 type 명칭크리스탈목록 = {
@@ -511,26 +511,6 @@ function 보주판매가(등급: number): number {
   return [0, 500, 2000, 8000, 25000, 100000][등급] ?? 500
 }
 
-// 크리스탈 효과표 (원본 맵 6종 크리스탈)
-const 크리스탈효과표: Record<크리스탈타입, { 설명: string; 값: number }> = {
-  증식: { 설명: '생산비용 -8%/등급', 값: 0.08 },
-  길운: { 설명: '강화확률 +1.5%p/등급', 값: 0.015 },
-  집중: { 설명: '공격력 +6%/등급', 값: 0.06 },
-  백색: { 설명: '파괴방지 +25%/등급', 값: 0.25 },
-  절제: { 설명: '강화비용 -8%/등급', 값: 0.08 },
-  경험: { 설명: '판매보상 +15%/등급', 값: 0.15 },
-}
-const 크리스탈구입비용 = [0, 100, 1000, 10000]  // 등급 1(노말)/2(레어)/3(유니크)
-
-function 크리스탈합산(장착ids: number[], 인벤: 크리스탈[], 종류: 크리스탈타입): number {
-  let total = 0
-  for (const id of 장착ids) {
-    const c = 인벤.find(x => x.id === id)
-    if (c && c.종류 === 종류) total += c.등급 * 크리스탈효과표[종류].값
-  }
-  return total
-}
-
 // 명칭 크리스탈 패시브 보너스 합산
 function 명칭크리스탈보너스(m: 명칭크리스탈목록) {
   const 개별확률 = (m.행운 + m.홍색 + m.보라) * 0.01 + m.백색명칭 * 0.02 + m.우주 * 0.05
@@ -575,9 +555,6 @@ export default function App() {
   // 보주 (보스 드랍, 3슬롯 장착)
   const [보주목록, set보주목록] = useState<보주[]>([])
   const [장착보주, set장착보주] = useState<number[]>([])
-  // 크리스탈 (조각으로 구입, 3슬롯 장착)
-  const [크리스탈목록, set크리스탈목록] = useState<크리스탈[]>([])
-  const [장착크리스탈, set장착크리스탈] = useState<number[]>([])
   // 캐릭터 레벨
   const [캐릭레벨, set캐릭레벨] = useState(1)
   const [경험치, set경험치] = useState(0)
@@ -602,6 +579,8 @@ export default function App() {
   // 고유유닛
   const [고유유닛, set고유유닛] = useState<고유유닛스텟>(() => ({ ...초기고유유닛 }))
   const [고유유닛패널열림, set고유유닛패널열림] = useState(false)
+  const [고유유닛pos, set고유유닛pos] = useState<Pos>({ x: 필드_W * 0.4, y: 200 })
+  const [고유유닛선택, set고유유닛선택] = useState(false)
   // 초월레벨
   const [초월레벨, set초월레벨] = useState(0)
   const [초월잔여포인트, set초월잔여포인트] = useState(0)
@@ -609,7 +588,6 @@ export default function App() {
   const [업그레이드, set업그레이드] = useState({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
   // 패널
   const [보주패널열림, set보주패널열림] = useState(false)
-  const [크리스탈패널열림, set크리스탈패널열림] = useState(false)
   const [강화패널열림, set강화패널열림] = useState(false)
   // 통계
   const [누적강화성공, set누적강화성공] = useState(0)
@@ -641,8 +619,6 @@ export default function App() {
   const 최고DPSRef = useRef(최고DPS); 최고DPSRef.current = 최고DPS
   const 장착보주Ref = useRef(장착보주); 장착보주Ref.current = 장착보주
   const 보주목록Ref = useRef(보주목록); 보주목록Ref.current = 보주목록
-  const 장착크리스탈Ref = useRef(장착크리스탈); 장착크리스탈Ref.current = 장착크리스탈
-  const 크리스탈목록Ref = useRef(크리스탈목록); 크리스탈목록Ref.current = 크리스탈목록
   const 무색조각Ref = useRef(무색조각); 무색조각Ref.current = 무색조각
   const 응무조Ref = useRef(응무조); 응무조Ref.current = 응무조
   const 크리스탈조각Ref = useRef(크리스탈조각); 크리스탈조각Ref.current = 크리스탈조각
@@ -655,6 +631,8 @@ export default function App() {
   const 크레딧Ref = useRef(크레딧); 크레딧Ref.current = 크레딧
   const 보석Ref = useRef(보석); 보석Ref.current = 보석
   const 고유유닛Ref = useRef(고유유닛); 고유유닛Ref.current = 고유유닛
+  const 고유유닛posRef = useRef(고유유닛pos); 고유유닛posRef.current = 고유유닛pos
+  const 고유유닛선택Ref = useRef(고유유닛선택); 고유유닛선택Ref.current = 고유유닛선택
   const 초월레벨Ref = useRef(초월레벨); 초월레벨Ref.current = 초월레벨
   const 초월잔여포인트Ref = useRef(초월잔여포인트); 초월잔여포인트Ref.current = 초월잔여포인트
   const 업그레이드Ref = useRef(업그레이드); 업그레이드Ref.current = 업그레이드
@@ -669,6 +647,7 @@ export default function App() {
   const dmgIdRef = useRef(0)
   const 자동구입강도Ref = useRef(자동구입강도); 자동구입강도Ref.current = 자동구입강도
   const 자동구입타이머Ref = useRef(0)
+  const 보석연속타이머Ref = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastTapRef = useRef<{ id: number; time: number } | null>(null)
   const 선택IDRef = useRef(선택ID); 선택IDRef.current = 선택ID
   const 현재화면Ref = useRef(현재화면); 현재화면Ref.current = 현재화면
@@ -688,8 +667,7 @@ export default function App() {
   const _보주공속r = 보주합산(장착보주, 보주목록, '공속')
   const _보주자원r = 보주합산(장착보주, 보주목록, '자원')
   const _보주배수r = 보주합산(장착보주, 보주목록, '배수')
-  const _크리스탈집중r = 크리스탈합산(장착크리스탈, 크리스탈목록, '집중')
-  const _공격력배수r = (1 + _보주공격r + 업그레이드.공격력 * 0.03) * (1 + _크리스탈집중r)
+  const _공격력배수r = (1 + _보주공격r + 업그레이드.공격력 * 0.03)
   const _공속배수r = 1 + _보주공속r + 업그레이드.공속 * 0.02
   const _크리r = Math.min(0.95, _보주크리r)
   const 사냥터캡 = 8 + 보스처치수 * 4
@@ -735,8 +713,6 @@ export default function App() {
           if (typeof d.크리스탈조각 === 'number') set크리스탈조각(d.크리스탈조각)
           if (Array.isArray(d.보주목록)) set보주목록(d.보주목록)
           if (Array.isArray(d.장착보주)) set장착보주(d.장착보주)
-          if (Array.isArray(d.크리스탈목록)) set크리스탈목록(d.크리스탈목록)
-          if (Array.isArray(d.장착크리스탈)) set장착크리스탈(d.장착크리스탈)
           if (typeof d.누적강화성공 === 'number') set누적강화성공(d.누적강화성공)
           if (typeof d.누적판매 === 'number') set누적판매(d.누적판매)
           if (typeof d.최고마린lv === 'number') set최고마린lv(d.최고마린lv)
@@ -787,7 +763,7 @@ export default function App() {
     AsyncStorage.setItem(저장키, JSON.stringify({
       마린들: minimal마린들, mineral, 총공격수, 보스처치수, 최고DPS,
       무색조각, 응무조, 크리스탈조각,
-      보주목록, 장착보주, 크리스탈목록, 장착크리스탈,
+      보주목록, 장착보주,
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈,
@@ -798,7 +774,7 @@ export default function App() {
     }))
   }, [마린들, mineral, 총공격수, 보스처치수, 최고DPS,
       무색조각, 응무조, 크리스탈조각,
-      보주목록, 장착보주, 크리스탈목록, 장착크리스탈,
+      보주목록, 장착보주,
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈,
@@ -831,11 +807,9 @@ export default function App() {
       const huntingMarines = currentMarines.filter(m => m.location === 'hunting')
       const bossMarines = currentMarines.filter(m => m.location === 'boss')
 
-      // 보주/크리스탈 멀티플라이어 사전 계산
+      // 보주 멀티플라이어 사전 계산
       const eqBj = 장착보주Ref.current
       const invBj = 보주목록Ref.current
-      const eqCr = 장착크리스탈Ref.current
-      const invCr = 크리스탈목록Ref.current
       const upg = 업그레이드Ref.current
       const 스텟 = 일반스텟Ref.current
       const 보주공격 = 보주합산(eqBj, invBj, '공격')
@@ -845,14 +819,12 @@ export default function App() {
       const 보주크리 = 보주합산(eqBj, invBj, '크리')
       const 보주공속 = 보주합산(eqBj, invBj, '공속')
       const 보주배수 = 보주합산(eqBj, invBj, '배수')
-      const 크리집중 = 크리스탈합산(eqCr, invCr, '집중')
-      const 크리길운 = 크리스탈합산(eqCr, invCr, '길운')
       const 명칭보너스 = 명칭크리스탈보너스(명칭크리스탈Ref.current)
       const 보석b = 보석보너스합산(보석Ref.current)
       const 고유유닛스텟cur = 고유유닛Ref.current
       const 고유DPS = 고유유닛DPS(고유유닛스텟cur)
       const 초월lv = 초월레벨Ref.current
-      const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05) * (1 + 크리집중)
+      const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05)
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
       const 속도 = Math.min(450, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
@@ -968,7 +940,7 @@ export default function App() {
               state: 'idle' as 유닛상태,
               dest: null,
             }
-            const 외부강화보너스 = 보주강화 + 크리길운 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005
+            const 외부강화보너스 = 보주강화 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005
             // 50강 → 51강 초월 시도
             if (m.lv === 50) {
               const 초월p = (초월스텟Ref.current.추가초월확률 + 명칭보너스.초월확률 + 초월lv) * 0.00001 + 보석b.초월확률추가
@@ -1160,7 +1132,7 @@ export default function App() {
       // 판매소 zone에 도달한 마린 판매 처리
       let 판매무색 = 0, 판매응무조 = 0, 판매크리조각 = 0
       const 판매보주드랍: 보주[] = []
-      const 판매보상배수 = 1 + 보주합산(eqBj, invBj, '판매') + 크리스탈합산(eqCr, invCr, '경험') + 명칭보너스.판매배수
+      const 판매보상배수 = 1 + 보주합산(eqBj, invBj, '판매') + 명칭보너스.판매배수
       const 무색배수 = 1 + 보주합산(eqBj, invBj, '무색') + 명칭보너스.무색배수
       const 조각배수 = 1 + 보주합산(eqBj, invBj, '조각')
       for (const s of 판매수집) {
@@ -1372,6 +1344,17 @@ export default function App() {
     메시지표시(`💎 ${종류} 보석 구입!`)
   }
 
+  function 보석연속시작(종류: 보석타입) {
+    보석구입(종류)
+    보석연속타이머Ref.current = setInterval(() => 보석구입(종류), 200)
+  }
+  function 보석연속종료() {
+    if (보석연속타이머Ref.current) {
+      clearInterval(보석연속타이머Ref.current)
+      보석연속타이머Ref.current = null
+    }
+  }
+
   // 고유유닛 강화 (크레딧 사용)
   const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치2'>, (lv: number) => number> = {
     공격력:   lv => (lv + 1) * 100,
@@ -1429,15 +1412,6 @@ export default function App() {
     set무색조각(prev => prev - 변환 * 10000)
     set응무조(prev => prev + 변환)
     메시지표시(`💠 ${변환} 응축 (1만 무색 → 1 응무)`)
-  }
-
-  function 크리스탈구입(종류: 크리스탈타입, 등급: number) {
-    const 비용 = 크리스탈구입비용[등급]
-    if (크리스탈조각Ref.current < 비용) { 메시지표시(`🔮 크리스탈조각 ${비용} 필요`); return }
-    set크리스탈조각(prev => prev - 비용)
-    const 새: 크리스탈 = { id: Date.now() + Math.random(), 종류, 등급 }
-    set크리스탈목록(prev => [...prev, 새])
-    메시지표시(`✨ ${종류} ${['', '노말', '레어', '유니크'][등급]} 크리스탈 획득!`)
   }
 
   function 유닛구매(강도: number) {
@@ -1545,6 +1519,24 @@ export default function App() {
         const 적 = findEnemyAt(end)
         const screen = 현재화면Ref.current
 
+        // 0. 고유유닛 탭 체크 (사냥터 화면)
+        if (screen === 'hunting') {
+          if (거리(end, 고유유닛posRef.current) < 마린_크기 / 2 + 10) {
+            if (고유유닛선택Ref.current) {
+              set고유유닛선택(false)
+            } else {
+              set고유유닛선택(true)
+              set고유유닛패널열림(true)
+              set선택ID([])
+            }
+            return
+          }
+          if (고유유닛선택Ref.current) {
+            set고유유닛pos(clampPosStatic(end))
+            return
+          }
+        }
+
         // 1. 마린 탭 = 선택 (더블탭 = 같은 강도 전체)
         if (마린) {
           const tapNow = Date.now()
@@ -1596,7 +1588,6 @@ export default function App() {
     set최고DPS(0)
     set무색조각(0); set응무조(0); set크리스탈조각(0)
     set보주목록([]); set장착보주([])
-    set크리스탈목록([]); set장착크리스탈([])
     set업그레이드({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
     set캐릭레벨(1); set경험치(0); set잔여포인트(0)
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
@@ -1608,7 +1599,7 @@ export default function App() {
     set초월레벨(0)
     set초월잔여포인트(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1)
-    set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
+    set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
     set보석패널열림(false); set고유유닛패널열림(false)
     set몹들(초기몹들())
     set자동강화ON(false); set자동강화최대lv(1)
@@ -1684,49 +1675,43 @@ export default function App() {
       <View style={styles.smallBtnBar}>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !생산패널열림
-          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🏭 생산</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !자동패널열림
-          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🤖 자동</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !강화패널열림
-          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>✨ 강화</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !보주패널열림
-          set보주패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set보주패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>⚔️ 보주 ({장착보주.length}/3)</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
-          const v = !크리스탈패널열림
-          set크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
-        }}>
-          <Text style={styles.smallBtnText}>💎 크리 ({장착크리스탈.length}/3)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !명칭크리스탈패널열림
-          set명칭크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set명칭크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
-          <Text style={styles.smallBtnText}>🌟 명칭</Text>
+          <Text style={styles.smallBtnText}>🌟 크리스탈</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !보석패널열림
-          set보석패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false) }
+          set보석패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>💎 보석</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !고유유닛패널열림
-          set고유유닛패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
+          set고유유닛패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🦸 고유({크레딧})</Text>
         </TouchableOpacity>
@@ -1828,6 +1813,33 @@ export default function App() {
             </View>
           )
         })}
+
+        {/* 고유유닛 (사냥터에 항상 배치) */}
+        {현재화면 === 'hunting' && (
+          <View pointerEvents="none">
+            {고유유닛선택 && (
+              <View style={[styles.selectRing, {
+                left: 고유유닛pos.x - 마린_크기 / 2 - 3,
+                top: 고유유닛pos.y - 마린_크기 / 2 - 3,
+                borderColor: '#a855f7',
+              }]} />
+            )}
+            <View style={[styles.marine, {
+              left: 고유유닛pos.x - 마린_크기 / 2,
+              top: 고유유닛pos.y - 마린_크기 / 2,
+              borderColor: '#a855f7',
+              borderWidth: 고유유닛선택 ? 3 : 2,
+              backgroundColor: '#a855f740',
+            }]}>
+              <Text style={styles.marineText}>🦸</Text>
+            </View>
+            <Text style={[styles.marineLv, {
+              left: 고유유닛pos.x - 15,
+              top: 고유유닛pos.y + 마린_크기 / 2 - 2,
+              color: '#a855f7',
+            }]}>고유</Text>
+          </View>
+        )}
 
         {/* 데미지 floating (보스존만) */}
         {현재화면 === 'boss' && dmg플로팅들.map(d => {
@@ -2177,81 +2189,6 @@ export default function App() {
         </View>
       )}
 
-      {/* 크리스탈 패널 (조각으로 구입, 3슬롯 장착) */}
-      {크리스탈패널열림 && (
-        <View style={styles.prodPanel}>
-          <View style={styles.prodHeader}>
-            <Text style={styles.prodTitle}>💎 크리스탈 ({장착크리스탈.length}/3)</Text>
-            <TouchableOpacity onPress={() => set크리스탈패널열림(false)}>
-              <Text style={styles.closeBtn}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.prodSubtitle}>🔮 크리스탈조각: {숫자포맷(크리스탈조각)} · 탭=장착/해제</Text>
-          <ScrollView style={{ maxHeight: 320 }}>
-            <Text style={[styles.prodSubtitle, { color: '#7ed957', marginTop: 4 }]}>🛒 구입</Text>
-            {크리스탈종류목록.map(종류 => {
-              const eff = 크리스탈효과표[종류]
-              return (
-                <View key={종류} style={styles.upgRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.upgLabel}>{종류}</Text>
-                    <Text style={styles.upgEffect}>{eff.설명}</Text>
-                  </View>
-                  {([1, 2, 3] as const).map(등급 => {
-                    const 비용 = 크리스탈구입비용[등급]
-                    const ok = 크리스탈조각 >= 비용
-                    const 등급명 = ['', '노말', '레어', '유니크'][등급]
-                    return (
-                      <TouchableOpacity
-                        key={등급}
-                        style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 52, paddingHorizontal: 4, marginLeft: 4 }]}
-                        onPress={() => 크리스탈구입(종류, 등급)}
-                      >
-                        <Text style={styles.upgBtnText}>{등급명}</Text>
-                        <Text style={[styles.upgEffect, { color: ok ? '#fff' : '#666', fontSize: 9 }]}>🔮{숫자포맷(비용)}</Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              )
-            })}
-
-            {크리스탈목록.length > 0 && (
-              <>
-                <View style={styles.divider} />
-                <Text style={[styles.prodSubtitle, { color: '#f5a623' }]}>📦 보유</Text>
-                {크리스탈목록.map(c => {
-                  const 장착됨 = 장착크리스탈.includes(c.id)
-                  const eff = 크리스탈효과표[c.종류]
-                  const 등급명 = ['', '노말', '레어', '유니크'][c.등급]
-                  const 가득 = !장착됨 && 장착크리스탈.length >= 3
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[styles.gemRow, 장착됨 && styles.gemRowEq, 가득 && { opacity: 0.4 }]}
-                      onPress={() => {
-                        if (장착됨) {
-                          set장착크리스탈(prev => prev.filter(id => id !== c.id))
-                        } else if (장착크리스탈.length < 3) {
-                          set장착크리스탈(prev => [...prev, c.id])
-                        } else {
-                          메시지표시('슬롯 가득 — 다른 크리스탈 해제 먼저')
-                        }
-                      }}
-                    >
-                      <Text style={[styles.gemGrade, { width: 40 }]}>{등급명}</Text>
-                      <Text style={[styles.gemType, { width: 40 }]}>{c.종류}</Text>
-                      <Text style={styles.gemEffect}>{eff.설명}</Text>
-                      <Text style={[styles.gemBadge, 장착됨 && { color: '#7ed957' }]}>{장착됨 ? '장착' : '해제'}</Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </>
-            )}
-          </ScrollView>
-        </View>
-      )}
-
       {/* 명칭 크리스탈 패널 */}
       {명칭크리스탈패널열림 && (() => {
         type 크탭 = '노말' | '레어' | '유니크' | '갤럭시' | '퀘이사' | '오리진'
@@ -2382,7 +2319,8 @@ export default function App() {
                     </View>
                     <TouchableOpacity
                       style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 70 }]}
-                      onPress={() => 보석구입(종류)}
+                      onPressIn={() => 보석연속시작(종류)}
+                      onPressOut={보석연속종료}
                     >
                       <Text style={styles.upgBtnText}>🔷{숫자포맷(비용)}</Text>
                     </TouchableOpacity>
@@ -2521,18 +2459,12 @@ export default function App() {
           {/* 자동 구입 */}
           <View style={styles.sliderRow}>
             <Text style={styles.sliderLabel}>🏭 구입 =</Text>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입강도(v => Math.max(1, v - 5))}>
-              <Text style={styles.sliderArrowText}>≪</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입강도(v => Math.max(1, v - 1))}>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입강도(v => { const i = 생산강도목록.indexOf(v as any); return 생산강도목록[Math.max(0, i - 1)] ?? v })}>
               <Text style={styles.sliderArrowText}>◀</Text>
             </TouchableOpacity>
             <Text style={styles.sliderValue}>+{자동구입강도}</Text>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입강도(v => Math.min(60, v + 1))}>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입강도(v => { const i = 생산강도목록.indexOf(v as any); return 생산강도목록[Math.min(생산강도목록.length - 1, i + 1)] ?? v })}>
               <Text style={styles.sliderArrowText}>▶</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입강도(v => Math.min(60, v + 5))}>
-              <Text style={styles.sliderArrowText}>≫</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.autoToggle, 자동구입ON && styles.autoToggleOn]}
@@ -2561,7 +2493,7 @@ export default function App() {
           </View>
           <Text style={styles.prodSubtitle}>강도를 선택하여 마린을 구매하세요</Text>
           <View style={styles.prodGrid}>
-            {Array.from({ length: 11 }, (_, i) => i + 1).map(강도 => {
+            {생산강도목록.map(강도 => {
               const 비용 = 생산비용(강도)
               const 가능 = mineral >= 비용
               return (
