@@ -1696,23 +1696,19 @@ export default function App() {
       const finalMarines = newMarines.filter(m => m.id !== -1)
       set마린들(finalMarines)
 
-      // 자동 구입 (총 마린 200 미만일 때만)
-      const 판매lv고정 = 자동판매ONRef.current ? 자동판매lvRef.current : 0
+      // 자동 구입 (총 마린 200 미만). 자동판매와 lv 동일해도 OK → 구입 후 다음 tick에 자동판매가 처리
       const 총마린수예상 = currentMarines.length - 판매수집.length
       if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 200) {
         const lv = 자동구입강도Ref.current
-        const 판매충돌 = 판매lv고정 > 0 && lv === 판매lv고정
-        if (!판매충돌) {
-          const cost = 생산비용(lv)
-          const 가용 = 잔여Mineral + 추가미네랄
-          if (가용 >= cost) {
-            자동구입타이머Ref.current = now
-            잔여Mineral -= cost
-            set마린들(prev => {
-              const baseCount = prev.filter(m => m.location === 'base').length
-              return [...prev, 새마린(lv, 베이스시작위치(baseCount), 'base')]
-            })
-          }
+        const cost = 생산비용(lv)
+        const 가용 = 잔여Mineral + 추가미네랄
+        if (가용 >= cost) {
+          자동구입타이머Ref.current = now
+          잔여Mineral -= cost
+          set마린들(prev => {
+            const baseCount = prev.filter(m => m.location === 'base').length
+            return [...prev, 새마린(lv, 베이스시작위치(baseCount), 'base')]
+          })
         }
       }
 
@@ -3318,7 +3314,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.prodSubtitle}>자동 판매가 자동 구입보다 우선 적용</Text>
+          <Text style={styles.prodSubtitle}>판매 &gt; 강화 우선. 자동구입과 자동판매는 함께 작동</Text>
 
           {/* 자동 강화 */}
           <View style={styles.sliderRow}>
