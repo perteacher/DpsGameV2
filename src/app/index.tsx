@@ -329,12 +329,12 @@ function 자원배수(총DPS: number): number {
   return 128
 }
 
-// 캐릭터 레벨 — 다음 레벨 필요 경험치. 30만 레벨까지 부드럽게 (polynomial)
+// 캐릭터 레벨 — 다음 레벨 필요 경험치. 30만 레벨까지. 사용자 요청 대폭 감소
 const 캐릭레벨최대 = 300000
 function 다음경험치(lv: number): number {
   if (lv >= 캐릭레벨최대) return Infinity
-  // 100 * lv^2 → lv 1: 100, lv 1000: 1e8, lv 30만: 9e12
-  return Math.round(100 * lv * lv)
+  // 10 * lv → lv 1: 10, lv 1000: 1만, lv 30만: 300만 (linear, 매우 부드러움)
+  return Math.max(10, Math.round(10 * lv))
 }
 
 const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46] as const
@@ -1249,7 +1249,7 @@ export default function App() {
           if (typeof d.총공격수 === 'number') set총공격수(d.총공격수)
           if (typeof d.보스처치수 === 'number') {
             set보스처치수(d.보스처치수)
-            set적들(초기적들(d.보스처치수 + 1))
+            set적들(d.보스처치수 >= 10 ? [] : 초기적들(d.보스처치수 + 1))
           }
           if (typeof d.최고DPS === 'number') set최고DPS(d.최고DPS)
           if (typeof d.무색조각 === 'number') set무색조각(d.무색조각)
@@ -2007,7 +2007,8 @@ export default function App() {
         const 새보스 = baseN + 1
         const 새배수 = 1 + Math.min(새보스, 10) * 0.5
         if (새보스 >= 10) {
-          메시지표시(`🌌 10보스 전체 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+500 · 보스존 종료 (이후 타격수 시스템)`)
+          set적들([])  // 보스존 종료
+          메시지표시(`🌌 10보스 전체 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+500 · 보스존 종료`)
         } else {
           메시지표시(`⚔️ 보스 ${새보스}/10 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+500 · 사냥터+4 🔮+${조각드랍}`)
         }
@@ -2516,11 +2517,11 @@ export default function App() {
         // 0. 고유유닛 탭 체크 (사냥터 화면)
         if (is사냥터(screen)) {
           if (거리(end, 고유유닛posRef.current) < 마린_크기 / 2 + 10) {
+            // 클릭 시 강화창 안 열고 선택 토글만
             if (고유유닛선택Ref.current) {
               set고유유닛선택(false)
             } else {
               set고유유닛선택(true)
-              set고유유닛패널열림(true)
               set선택ID([])
             }
             return
@@ -2643,7 +2644,21 @@ export default function App() {
       <View style={styles.statBox}>
         <View style={styles.statRow}>
           <Text style={styles.stat}>💎 {숫자포맷(mineral)}</Text>
-          <Text style={styles.statSmall}>🎯 {숫자포맷(총공격수)}</Text>
+          <TouchableOpacity onPress={() => {
+            const next = 타격마일스톤표[타격수획득idx]
+            if (!next) { 메시지표시('🏆 타격수 마일스톤 전부 완료'); return }
+            const r = next.보상
+            const parts: string[] = []
+            if (r.ExP) parts.push(`⭐${숫자포맷(r.ExP)}`)
+            if (r.조각) parts.push(`🔮${r.조각}`)
+            if (r.크리스탈박스.length) parts.push(`🌟${r.크리스탈박스.length}박스(${r.크리스탈박스[0]})`)
+            if (r.은하조각) parts.push(`🌌${r.은하조각}`)
+            if (r.크레딧) parts.push(`💰${숫자포맷(r.크레딧)}`)
+            if (r.상급조각) parts.push(`🟣${r.상급조각}`)
+            메시지표시(`🎯 다음: ${next.라벨}회 (${숫자포맷(총공격수)}/${숫자포맷(next.임계값)}) → ${parts.join(' ')}`)
+          }}>
+            <Text style={styles.statSmall}>🎯 {숫자포맷(총공격수)}</Text>
+          </TouchableOpacity>
           <Text style={[styles.statSmall, { color: 잔여포인트 > 0 ? '#f5a623' : '#aaa' }]}>Lv.{캐릭레벨}{잔여포인트 > 0 ? ` (+${잔여포인트}P)` : ''}</Text>
           <TouchableOpacity onPress={() => set재화패널열림(v => !v)} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#3a5a8a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>💰 재화</Text>
@@ -2751,7 +2766,7 @@ export default function App() {
           const v = !고유유닛패널열림
           set고유유닛패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
         }}>
-          <Text style={styles.smallBtnText}>🦸 고유({크레딧})</Text>
+          <Text style={styles.smallBtnText}>🦸 고유</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.smallBtn, { backgroundColor: '#5b2a8c' }]} onPress={() => {
           const v = !환생패널열림
@@ -2921,49 +2936,38 @@ export default function App() {
           )
         })}
 
-        {/* BOSS: 6단계까지 일반 보스, 7부터 Extra Boss (타격수 진행) */}
+        {/* BOSS: 10단계까지. ExtraBoss 제거 */}
         {현재화면 === 'boss' && 적들.map(e => {
           const flash = e.flashUntil > now
-          const extra = 보스처치수 >= 6
           const gate = 보스DPS게이트(보스처치수 + 1)
           const ok = 사냥터DPS >= gate
-          // Extra Boss 모드: 타격수 다음 마일스톤 진행률
-          const 다음마일 = extra && 타격수획득idx < 타격마일스톤표.length ? 타격마일스톤표[타격수획득idx] : null
-          const 마일진행 = 다음마일 ? Math.min(100, (총공격수 / 다음마일.임계값) * 100) : 0
           return (
             <View key={e.id} pointerEvents="none">
               <View style={[styles.enemy, {
                 left: e.pos.x - 보스_크기 / 2,
                 top: e.pos.y - 보스_크기 / 2,
-                backgroundColor: flash ? '#ff6b6b' : extra ? '#4a1a5a' : '#5a2a2a',
+                backgroundColor: flash ? '#ff6b6b' : '#5a2a2a',
                 width: 보스_크기, height: 보스_크기, borderRadius: 보스_크기 / 2,
-                borderWidth: extra ? 3 : 0, borderColor: '#a855f7',
               }]}>
-                <Text style={{ fontSize: 68 }}>{extra ? '🌌' : '👹'}</Text>
+                <Text style={{ fontSize: 68 }}>👹</Text>
               </View>
-              <Text style={[styles.bossLabel, { left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 50, width: 200, color: extra ? '#a855f7' : '#fff' }]}>
-                {extra ? `🌌 Extra Boss` : `👹 보스 ${보스처치수 + 1}`}
+              <Text style={[styles.bossLabel, { left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 50, width: 200, color: '#fff' }]}>
+                👹 보스 {보스처치수 + 1}/10
               </Text>
-              {extra ? (
-                <Text style={[styles.bossLabel, {
-                  left: e.pos.x - 120, top: e.pos.y - 보스_크기 / 2 - 34, width: 240,
-                  color: '#f5a623', fontSize: 10,
-                }]}>
-                  {다음마일
-                    ? `${다음마일.라벨} 진행 ${마일진행.toFixed(1)}% (${숫자포맷(총공격수)}/${숫자포맷(다음마일.임계값)})`
-                    : `🏆 모든 타격수 마일스톤 완료!`}
-                </Text>
-              ) : (
-                <Text style={[styles.bossLabel, {
-                  left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 34, width: 200,
-                  color: ok ? '#7ed957' : '#ccc', fontSize: 10,
-                }]}>
-                  DPS {숫자포맷(사냥터DPS)} / {숫자포맷(gate)} {ok ? '✓ 클리어 중' : '✗ DPS 부족'}
-                </Text>
-              )}
+              <Text style={[styles.bossLabel, {
+                left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 34, width: 200,
+                color: ok ? '#7ed957' : '#ccc', fontSize: 10,
+              }]}>
+                DPS {숫자포맷(사냥터DPS)} / {숫자포맷(gate)} {ok ? '✓ 클리어 중' : '✗ DPS 부족'}
+              </Text>
             </View>
           )
         })}
+        {현재화면 === 'boss' && 적들.length === 0 && (
+          <Text style={{ position: 'absolute', top: '40%', width: '100%', textAlign: 'center', color: '#a855f7', fontSize: 18 }}>
+            🌌 보스존 종료 (타격수 시스템으로)
+          </Text>
+        )}
 
         {/* 마린 (현재 화면에 있는 마린만) */}
         {화면마린들.map(m => {
