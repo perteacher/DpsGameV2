@@ -759,12 +759,13 @@ const _레벨업표E = [7, 20, 60, 350, 650, 1200, 1800, 3000, 5000, 10000]  // 
 const _레벨업표F = [15000, 24500, 45000, 90000, 180000, 350000, 700000, 1500000, 3000000, 6000000,
                   12500000, 15000000, 30000000, 60000000, 1.2e8, 2.5e8, 5e8, 1e9, 2e9, 4e9]  // 31~50: 우주/오리진
 const 크리스탈등급max: Record<크리스탈등급, number> = { 노말: 10, 레어: 10, 유니크: 20, 갤럭시: 50, 퀘이사: 20, 오리진: 50 }
-// 크리스탈 제작 비용 (크리스탈조각). 퀘이사/오리진은 추후 (상급조각/별도)
+// 크리스탈 제작 비용. 퀘이사는 상급크리스탈조각 사용, 그 외는 일반 크리스탈조각
 const 크리스탈제작비용: Partial<Record<크리스탈등급, number>> = {
   노말: 500,
   레어: 10000,
   유니크: 1000000,
   갤럭시: 30000000,
+  퀘이사: 10,  // 상급조각 10개
 }
 function 크리스탈레벨업비용(등급: 크리스탈등급, 현재lv: number): number {
   // 현재lv -> lv+1 비용 (현재lv 1~max-1 유효)
@@ -1137,6 +1138,7 @@ export default function App() {
   const 무색조각Ref = useRef(무색조각); 무색조각Ref.current = 무색조각
   const 응무조Ref = useRef(응무조); 응무조Ref.current = 응무조
   const 크리스탈조각Ref = useRef(크리스탈조각); 크리스탈조각Ref.current = 크리스탈조각
+  const 상급크리스탈조각Ref = useRef(상급크리스탈조각); 상급크리스탈조각Ref.current = 상급크리스탈조각
   const 강화최초달성Ref = useRef(강화최초달성); 강화최초달성Ref.current = 강화최초달성
   const 캐릭레벨Ref = useRef(캐릭레벨); 캐릭레벨Ref.current = 캐릭레벨
   const 경험치Ref = useRef(경험치); 경험치Ref.current = 경험치
@@ -1448,6 +1450,10 @@ export default function App() {
       const 기존사냥2수 = currentMarines.filter(m => m.location === 'hunting2').length
       const 기존사냥3수 = currentMarines.filter(m => m.location === 'hunting3').length
       let 사냥1추가 = 0, 사냥2추가 = 0, 사냥3추가 = 0
+      // 56강 융합 자원: 절약보주 1개당 -10 마리. 최소 1마리
+      const 융합필요수 = Math.max(1, 20000 - bj.절약 * 10)
+      const 융합소모IDs = new Set<number>()  // 이 tick에서 융합으로 제거될 55강 마린들
+      let 융합시도수행 = false  // tick당 1회만
       const 판매수집: { lv: number }[] = []
       let 화면전환target: 화면 | null = null
 
@@ -1547,10 +1553,21 @@ export default function App() {
               }
               return 새m
             }
-            // 51~59강: 초월 강화 (강화시도 사용, 실패시 초월 ExP 보상)
-            // 60강 = MAX, 50강 = 별도 (위에서 처리)
+            // 56강 융합: 55강 마린은 다른 55강 마린 N개 + 본인 소모. tick당 1회.
+            if (m.lv === 55) {
+              if (융합시도수행) return 새m  // 이미 이 tick에 시도됨, 대기
+              const 다른55후보 = currentMarines.filter(x => x.lv === 55 && x.id !== m.id && !융합소모IDs.has(x.id))
+              if (다른55후보.length < 융합필요수 - 1) {
+                // 부족 → 시도 안 함, 메시지 (저빈도)
+                if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 3000) {
+                  메시지표시(`🔮 56강 융합 필요 55강 마린 ${숫자포맷(융합필요수)} (현재 ${다른55후보.length + 1})`)
+                }
+                return 새m
+              }
+              융합시도수행 = true
+              for (let i = 0; i < 융합필요수 - 1; i++) 융합소모IDs.add(다른55후보[i].id)
+            }
             const 강화가능 = (m.lv < 50) || (m.lv >= 51 && m.lv < 60)
-            // 단계별 보주 보너스 합산 (54~59강)
             let 단계보주 = 0
             for (const k of 보주종류목록) {
               const eff = 보주효과표[k]
@@ -1828,7 +1845,7 @@ export default function App() {
       }
       if (총소모크레딧 > 0) set크레딧(prev => prev - 총소모크레딧)
       // id=-1 마린 제거 (판매소 도달 + 강화 실패 파괴)
-      const finalMarines = newMarines.filter(m => m.id !== -1)
+      const finalMarines = newMarines.filter(m => m.id !== -1 && !융합소모IDs.has(m.id))
       set마린들(finalMarines)
 
       // 자동 구입 (총 마린 200 미만). 자동판매와 lv 동일해도 OK → 구입 후 다음 tick에 자동판매가 처리
@@ -2310,13 +2327,16 @@ export default function App() {
     메시지표시(`✨ ${key} Lv.${curLv} → ${curLv + 1}`)
   }
 
-  // 크리스탈 제작 (크리스탈조각 소모 → 해당 크리스탈 +1)
+  // 크리스탈 제작 (퀘이사: 상급조각 / 그 외: 일반 크리스탈조각)
   function 크리스탈제작(key: keyof 명칭크리스탈목록) {
     const 등급 = 크리스탈등급맵[key]
     const cost = 크리스탈제작비용[등급]
     if (!cost) { 메시지표시(`⛔ ${등급} 제작은 추후 추가`); return }
-    if (크리스탈조각Ref.current < cost) { 메시지표시(`🔮 조각 부족 (필요 ${숫자포맷(cost)})`); return }
-    set크리스탈조각(prev => prev - cost)
+    const isQuasar = 등급 === '퀘이사'
+    const 잔여 = isQuasar ? 상급크리스탈조각Ref.current : 크리스탈조각Ref.current
+    if (잔여 < cost) { 메시지표시(`${isQuasar ? '🟣 상급조각' : '🔮 조각'} 부족 (필요 ${숫자포맷(cost)})`); return }
+    if (isQuasar) set상급크리스탈조각(prev => prev - cost)
+    else set크리스탈조각(prev => prev - cost)
     set명칭크리스탈(prev => ({ ...prev, [key]: (prev[key] as number) + 1 }))
     메시지표시(`🛠️ ${key} +1 제작`)
   }
@@ -3273,14 +3293,15 @@ export default function App() {
                       {(() => {
                         const 제비용 = 크리스탈제작비용[등급]
                         if (!제비용) return null
-                        const 제ok = 크리스탈조각 >= 제비용
+                        const isQ = 등급 === '퀘이사'
+                        const 제ok = (isQ ? 상급크리스탈조각 : 크리스탈조각) >= 제비용
                         return (
                           <TouchableOpacity
                             style={[styles.upgBtn, !제ok && styles.upgBtnOff, { backgroundColor: 제ok ? '#9b59b6' : '#444', minWidth: 60, paddingHorizontal: 4 }]}
                             onPress={() => 크리스탈제작(info.키)}
                           >
                             <Text style={[styles.upgBtnText, { fontSize: 9 }]}>🛠️ 제작</Text>
-                            <Text style={[styles.upgBtnText, { fontSize: 8, color: '#fff' }]}>🔮{숫자포맷(제비용)}</Text>
+                            <Text style={[styles.upgBtnText, { fontSize: 8, color: '#fff' }]}>{isQ ? '🟣' : '🔮'}{숫자포맷(제비용)}</Text>
                           </TouchableOpacity>
                         )
                       })()}
