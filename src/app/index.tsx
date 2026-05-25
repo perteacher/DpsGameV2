@@ -68,19 +68,90 @@ type 강화스텟 = {
   돈수급량: number; 유닛공업: number
 }
 
+// 일반스텟 메타 (label, max, cost per +1, 효과텍스트 계산)
+type 일반스텟메타 = { key: keyof 강화스텟; label: string; max: number; cost: number; 효과: (v: number) => string }
+const 일반스텟표: 일반스텟메타[] = [
+  { key: '돈수급량',      label: '💰 돈 수급량',           max: 100, cost: 100,   효과: v => `자원 +${v * 3}%` },
+  { key: '유닛공업',      label: '⚔️ 보유 유닛 공격력업', max: 50,  cost: 20,    효과: v => `강도별 upg ×(1+${v})` },
+  { key: '가산1강',       label: '🔨 +1강 확률',           max: 100, cost: 10,    효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산2강',       label: '🔨 +2강 확률',           max: 50,  cost: 200,   효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산3강',       label: '🔨 +3강 확률',           max: 30,  cost: 1000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '특수강화',      label: '⚡ 특수 강화 확률',      max: 100, cost: 500,   효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산1강2',      label: '🔩 +1강 확률 (2)',       max: 50,  cost: 1000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산2강2',      label: '🔩 +2강 확률 (2)',       max: 20,  cost: 2500,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산3강2',      label: '🔩 +3강 확률 (2)',       max: 10,  cost: 5000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '특수강화2',     label: '⚡ 특수강화 (2)',        max: 50,  cost: 1000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '특수파괴방지',  label: '🛡️ 파괴방지',           max: 300, cost: 250,   효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '특수파괴방지2', label: '🛡️ 파괴방지 (2)',       max: 100, cost: 1000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산44강',      label: '🌟 44강 확률',           max: 100, cost: 1000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산45강',      label: '🌟 45강 확률',           max: 100, cost: 2000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산46강',      label: '🌟 46강 확률',           max: 100, cost: 3000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산47강',      label: '🌟 47강 확률',           max: 100, cost: 4000,  효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '가산48강',      label: '💎 48강 확률',           max: 200, cost: 10000, 효과: v => `+${(v * 0.05).toFixed(2)}%` },
+]
+
+// 초월스텟 — 17종 신규 구조
+type 초월스텟타입 = {
+  추가초월확률: number
+  추가51강: number; 추가52강: number; 추가53강: number; 추가54강: number; 추가55강: number
+  공업51: number; 공업52: number; 공업53: number; 공업54: number; 공업55: number; 공업56: number
+  추가54강2: number; 추가55강2: number
+  추가융합: number
+  추가57강: number; 추가58강: number
+}
+const 초기초월스텟: 초월스텟타입 = {
+  추가초월확률: 0,
+  추가51강: 0, 추가52강: 0, 추가53강: 0, 추가54강: 0, 추가55강: 0,
+  공업51: 0, 공업52: 0, 공업53: 0, 공업54: 0, 공업55: 0, 공업56: 0,
+  추가54강2: 0, 추가55강2: 0,
+  추가융합: 0,
+  추가57강: 0, 추가58강: 0,
+}
+type 초월스텟메타 = { key: keyof 초월스텟타입; label: string; max: number; cost: number; 효과: (v: number) => string }
+const 초월스텟표: 초월스텟메타[] = [
+  { key: '추가초월확률', label: '🌀 추가 초월확률',  max: 100, cost: 1,    효과: v => `+${(v * 0.001).toFixed(3)}%` },
+  { key: '추가51강',     label: '⚡ 추가 51강 확률', max: 200, cost: 1,    효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '추가52강',     label: '⚡ 추가 52강 확률', max: 200, cost: 2,    효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '추가53강',     label: '⚡ 추가 53강 확률', max: 200, cost: 4,    효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '추가54강',     label: '⚡ 추가 54강 확률', max: 200, cost: 6,    효과: v => `+${(v * 0.01).toFixed(2)}%` },
+  { key: '추가55강',     label: '⚡ 추가 55강 확률', max: 200, cost: 8,    효과: v => `+${(v * 0.01).toFixed(2)}%` },
+  { key: '공업51',       label: '⚔️ 51강 유닛 공업', max: 50,  cost: 1,    효과: v => `+${v}` },
+  { key: '공업52',       label: '⚔️ 52강 유닛 공업', max: 50,  cost: 2,    효과: v => `+${v}` },
+  { key: '공업53',       label: '⚔️ 53강 유닛 공업', max: 50,  cost: 4,    효과: v => `+${v}` },
+  { key: '공업54',       label: '⚔️ 54강 유닛 공업', max: 50,  cost: 6,    효과: v => `+${v}` },
+  { key: '공업55',       label: '⚔️ 55강 유닛 공업', max: 30,  cost: 8,    효과: v => `+${v}` },
+  { key: '공업56',       label: '⚔️ 56강 유닛 공업', max: 30,  cost: 10,   효과: v => `+${v}` },
+  { key: '추가54강2',    label: '⚡ 추가 54강 확률 (2)', max: 160, cost: 200, 효과: v => `+${(v * 0.05).toFixed(2)}%` },
+  { key: '추가55강2',    label: '⚡ 추가 55강 확률 (2)', max: 300, cost: 200, 효과: v => `+${(v * 0.02).toFixed(2)}%` },
+  { key: '추가융합',     label: '🔮 추가 융합 확률', max: 100, cost: 250,  효과: v => `+${(v * 0.1).toFixed(1)}%p` },
+  { key: '추가57강',     label: '💥 추가 57강 확률', max: 50,  cost: 1000, 효과: v => `+${(v * 0.1).toFixed(1)}%` },
+  { key: '추가58강',     label: '💥 추가 58강 확률', max: 50,  cost: 1500, 효과: v => `+${(v * 0.1).toFixed(1)}%` },
+]
+
 // 강화 시도 — 스텟 적용 버전
 // 반환: 0=실패, 1=+1, 2=+2, 3=+3
 // 외부p1: 보주/크리스탈/영구강화에서 오는 추가 성공확률 (0~1 소수)
 // 보석p: 레벨별 보석 추가 확률
 type 보석p타입 = { add44: number; add45: number; add46: number; add47: number; add48: number }
 const 빈보석p: 보석p타입 = { add44: 0, add45: 0, add46: 0, add47: 0, add48: 0 }
-function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0, 보석p: 보석p타입 = 빈보석p): number {
+function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0, 보석p: 보석p타입 = 빈보석p, 초월s?: 초월스텟타입): number {
   if (단계 >= 60) return 0  // 60강 = MAX
   if (단계 === 50) return 0  // 50→51은 초월 시스템 별도
   const r = Math.random()
-  // 51~59강: 모두 외부보너스 기반 강화 (개별 base는 0)
+  // 51~59강: 외부보너스 + 신규 초월스텟 단계별 추가확률
   if (단계 >= 51) {
-    const p = Math.min(0.95, 외부p1)
+    let 초월보너스 = 0
+    if (초월s) {
+      if (단계 === 51) 초월보너스 = 초월s.추가51강 * 0.001
+      else if (단계 === 52) 초월보너스 = 초월s.추가52강 * 0.001
+      else if (단계 === 53) 초월보너스 = 초월s.추가53강 * 0.001
+      else if (단계 === 54) 초월보너스 = 초월s.추가54강 * 0.0001 + 초월s.추가54강2 * 0.0005
+      else if (단계 === 55) 초월보너스 = 초월s.추가55강 * 0.0001 + 초월s.추가55강2 * 0.0002
+      else if (단계 === 56) 초월보너스 = 초월s.추가융합 * 0.001
+      else if (단계 === 57) 초월보너스 = 초월s.추가57강 * 0.001
+      else if (단계 === 58) 초월보너스 = 초월s.추가58강 * 0.001
+    }
+    const p = Math.min(0.95, 외부p1 + 초월보너스)
     return r < p ? 1 : 0
   }
   const base = 강화확률표[단계] ?? 0
@@ -218,12 +289,17 @@ const _공속맵: Record<string, number> = {
   '초월':     1 / 0.15,   // 6.67
 }
 
-function 공격력(단계: number, 초월업51_56: number = 0, 초월공57_59: number = 0, 유닛공업: number = 0) {
+// 새 공격력 — 신규 초월스텟 구조 적용
+// - 일반.유닛공업: 모든 강도의 upg에 ×(1+v) (max 50)
+// - 초월.공업51~56: 해당 강도의 upg에 추가 (1pt = +1 유닛공업 등가)
+function 공격력(단계: number, 초월s?: 초월스텟타입, 일반공업: number = 0) {
   const t = 강도표[단계] ?? 강도표[1]
-  let dmg = t.base + t.upg * 유닛공업
-  if (단계 >= 51 && 단계 <= 56) dmg += 초월업51_56 * 9
-  if (단계 >= 57 && 단계 <= 59) dmg += 초월공57_59 * 8
-  return dmg
+  let 공업합 = 일반공업
+  if (초월s && 단계 >= 51 && 단계 <= 56) {
+    const 공업키 = (['공업51','공업52','공업53','공업54','공업55','공업56'] as const)[단계 - 51]
+    공업합 += 초월s[공업키] || 0
+  }
+  return t.base + t.upg * (1 + 공업합)
 }
 
 function 공격속도(단계: number) {
@@ -823,7 +899,7 @@ export default function App() {
   // 공격57_59: 57~59강 공격력 +8/pt
   // 융합56: 56강 융합 확률 +1%p/pt
   // 보스데미지: Extra Boss 데미지 +10%/pt
-  const [초월스텟, set초월스텟] = useState({ 추가초월확률: 0, 강화51_53: 0, 업그51_56: 0, 공격57_59: 0, 융합56: 0, 보스데미지: 0 })
+  const [초월스텟, set초월스텟] = useState<초월스텟타입>({ ...초기초월스텟 })
   const [스텟탭, set스텟탭] = useState<'일반' | '초월' | '보주' | '보석'>('일반')
   const [명칭크리스탈, set명칭크리스탈] = useState<명칭크리스탈목록>(() => ({ ...초기명칭크리스탈 }))
   const [장착크리스탈, set장착크리스탈] = useState<(keyof 명칭크리스탈목록)[]>([])
@@ -970,9 +1046,10 @@ export default function App() {
   const 사냥터캡 = 12 + Math.min(보스처치수, 6) * 6  // 12 → 보스당 +6 → 최대 48
   const 보스존캡 = 8
   const _초월r = 초월스텟
-  const 사냥터DPS = 보스존마린들.filter(m => m.state === 'attacking').reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
+  const _일반공업r = 일반스텟.유닛공업
+  const 사냥터DPS = 보스존마린들.filter(m => m.state === 'attacking').reduce((s, m) => s + 공격력(m.lv, _초월r, _일반공업r) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
   const 현재배수 = 자원배수(Math.max(사냥터DPS, 최고DPS)) * (1 + _보주배수r)
-  const 사냥터마린DPS = 사냥터마린들.reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
+  const 사냥터마린DPS = 사냥터마린들.reduce((s, m) => s + 공격력(m.lv, _초월r, _일반공업r) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
   const 시간당미네랄 = 사냥터마린DPS * 현재배수 * (1 + _보주자원r) * 3600
   const 선택한마린들 = 마린들.filter(m => 선택ID.includes(m.id)).sort((a, b) => b.lv - a.lv)
 
@@ -1030,7 +1107,14 @@ export default function App() {
           if (typeof d.경험치 === 'number') set경험치(d.경험치)
           if (typeof d.잔여포인트 === 'number') set잔여포인트(d.잔여포인트)
           if (d.일반스텟 && typeof d.일반스텟 === 'object') set일반스텟(prev => ({ ...prev, ...d.일반스텟 }))
-          if (d.초월스텟 && typeof d.초월스텟 === 'object') set초월스텟(prev => ({ ...prev, ...d.초월스텟 }))
+          if (d.초월스텟 && typeof d.초월스텟 === 'object') {
+            // 새 키만 픽 (옛 스키마 호환)
+            const cleaned: any = {}
+            for (const k of Object.keys(초기초월스텟) as (keyof 초월스텟타입)[]) {
+              if (typeof d.초월스텟[k] === 'number') cleaned[k] = d.초월스텟[k]
+            }
+            set초월스텟(prev => ({ ...prev, ...cleaned }))
+          }
           if (d.명칭크리스탈 && typeof d.명칭크리스탈 === 'object') set명칭크리스탈(prev => ({ ...prev, ...d.명칭크리스탈 }))
           if (Array.isArray(d.장착크리스탈)) set장착크리스탈(d.장착크리스탈)
           if (typeof d.크레딧 === 'number') set크레딧(d.크레딧)
@@ -1143,7 +1227,7 @@ export default function App() {
       const 고유DPS = 고유유닛DPS(고유유닛스텟cur)
       const 초월lv = 초월레벨Ref.current
       const 보스공격력보너스 = 1 + Math.min(보스처치수Ref.current, 6) * 0.5  // 보스1=×1.5 ... 보스6=×4
-      const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05) * 보스공격력보너스
+      const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03) * 보스공격력보너스  // 유닛공업은 공격력() 내부에서 처리
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
       const 속도 = Math.min(450, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
@@ -1151,7 +1235,7 @@ export default function App() {
       const 사냥터캡 = 12 + Math.min(보스처치수Ref.current, 6) * 6
       const 평균크리 = Math.min(0.95, 보주크리)
       const 초월s = 초월스텟Ref.current
-      const 효과DPS = (lv: number) => 공격력(lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 공격속도(lv) * 공속배수 * 연타수(lv) * (1 + 평균크리)
+      const 효과DPS = (lv: number) => 공격력(lv, 초월s, 스텟.유닛공업) * 공격력배수 * 공격속도(lv) * 공속배수 * 연타수(lv) * (1 + 평균크리)
       const huntingDPS = bossMarines.filter(m => m.state === 'attacking').reduce((s, m) => s + 효과DPS(m.lv), 0)
       if (huntingDPS > 최고DPSRef.current) {
         set최고DPS(huntingDPS)
@@ -1269,9 +1353,9 @@ export default function App() {
               dest: null,
             }
             // 초월 51_53강 강화확률 보너스 (51-53강 적용)
-            const 초월51_53보너스 = (m.lv >= 51 && m.lv <= 53) ? 초월s.강화51_53 * 0.02 : 0
+            const 초월51_53보너스 = 0  // 신규 초월스텟에서는 강화시도() 내부에서 단계별 처리
             // 초월 56강 융합확률 보너스 (56강 적용)
-            const 초월56융합 = (m.lv === 56) ? 초월s.융합56 * 0.01 : 0
+            const 초월56융합 = 0  // 신규 초월스텟에서 강화시도() 내부 처리
             const _환생강화보너스 = Math.min(0.05, (환생패시브['강화확률'] ?? 0) * 0.005)
             const 외부강화보너스 = 보주강화 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005 + 초월51_53보너스 + 초월56융합 + _환생강화보너스
             // 50강 → 51강 초월 시도
@@ -1291,7 +1375,7 @@ export default function App() {
             // 51~59강: 초월 강화 (강화시도 사용, 실패시 초월 ExP 보상)
             // 60강 = MAX, 50강 = 별도 (위에서 처리)
             const 강화가능 = (m.lv < 50) || (m.lv >= 51 && m.lv < 60)
-            const 증가 = 강화가능 ? 강화시도(m.lv, 스텟, 외부강화보너스, 보석b) : 0
+            const 증가 = 강화가능 ? 강화시도(m.lv, 스텟, 외부강화보너스, 보석b, 초월s) : 0
             if (증가 > 0) {
               // 성공 (+1강 / +2강 / +3강 또는 +1만 — 강화시도가 처리)
               새m.lv = m.lv + 증가
@@ -1387,8 +1471,8 @@ export default function App() {
               // 보스존 데미지 floating (재화 X, gate만 본다)
               const isCrit = Math.random() < 평균크리
               // 보스 데미지 보너스 (초월스텟 보스데미지 +10%/pt)
-              const 보스데미지배수 = 1 + 초월s.보스데미지 * 0.1
-              const dmgShow = Math.round(공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 보스데미지배수 * 연타수(n.lv) * (isCrit ? 2 : 1))
+              const 보스데미지배수 = 1  // 신규 초월스텟에 보스데미지 없음 (보스공격력보너스로 대체됨)
+              const dmgShow = Math.round(공격력(n.lv, 초월s, 스텟.유닛공업) * 공격력배수 * 보스데미지배수 * 연타수(n.lv) * (isCrit ? 2 : 1))
               if (Math.random() < 0.4) {
                 const fid = dmgIdRef.current++
                 setDmg플로팅들(prev => [...prev.slice(-20), {
@@ -1430,7 +1514,7 @@ export default function App() {
               n.마지막공격시간 = now
               n.공격플래시Until = now + 150
               const isCrit = Math.random() < 평균크리
-              const dmg = 공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 연타수(n.lv) * (isCrit ? 2 : 1)
+              const dmg = 공격력(n.lv, 초월s, 스텟.유닛공업) * 공격력배수 * 연타수(n.lv) * (isCrit ? 2 : 1)
               // 티어별 보상 배수: 1=×1 mineral, 2=×3 mineral, 3=×6 mineral+credit (DPS측정기)
               const tier = target.티어
               const tierMul = tier === 1 ? 1 : tier === 2 ? 3 : 6
@@ -1818,17 +1902,32 @@ export default function App() {
     if (lv > startLv) 메시지표시(`🎊 레벨업! Lv.${lv} (+${lv - startLv} 포인트)`)
   }
 
-  // 스탯 포인트 분배 (일반 스텟)
-  function 스탯올리기(stat: keyof 강화스텟, amount = 1) {
-    if (잔여포인트Ref.current < amount) return
-    set잔여포인트(p => p - amount)
-    set일반스텟(prev => ({ ...prev, [stat]: prev[stat] + amount }))
+  // 스탯 포인트 분배 (일반 스텟) — max/cost 메타 기반
+  // count = 올리고 싶은 횟수 (1 = +1, Infinity = ALL)
+  function 스탯올리기(stat: keyof 강화스텟, count = 1) {
+    const meta = 일반스텟표.find(m => m.key === stat)
+    if (!meta) return
+    const cur = 일반스텟Ref.current[stat]
+    const 가능횟수 = Math.max(0, meta.max - cur)
+    if (가능횟수 === 0) { 메시지표시(`⛔ ${meta.label} MAX (${meta.max})`); return }
+    const 살횟수 = Math.min(count, 가능횟수, Math.floor(잔여포인트Ref.current / meta.cost))
+    if (살횟수 <= 0) { 메시지표시(`⛔ 포인트 부족 (1회 ${meta.cost}P)`); return }
+    const 총비용 = 살횟수 * meta.cost
+    set잔여포인트(p => p - 총비용)
+    set일반스텟(prev => ({ ...prev, [stat]: prev[stat] + 살횟수 }))
   }
   // 스탯 포인트 분배 (초월 스텟, 초월잔여포인트 사용)
-  function 초월스탯올리기(stat: keyof typeof 초월스텟, amount = 1) {
-    if (초월잔여포인트Ref.current < amount) { 메시지표시('⛔ 초월 포인트 부족 (51강 달성 시 획득)'); return }
-    set초월잔여포인트(p => p - amount)
-    set초월스텟(prev => ({ ...prev, [stat]: prev[stat] + amount }))
+  function 초월스탯올리기(stat: keyof 초월스텟타입, count = 1) {
+    const meta = 초월스텟표.find(m => m.key === stat)
+    if (!meta) return
+    const cur = 초월스텟Ref.current[stat]
+    const 가능횟수 = Math.max(0, meta.max - cur)
+    if (가능횟수 === 0) { 메시지표시(`⛔ ${meta.label} MAX (${meta.max})`); return }
+    const 살횟수 = Math.min(count, 가능횟수, Math.floor(초월잔여포인트Ref.current / meta.cost))
+    if (살횟수 <= 0) { 메시지표시(`⛔ 초월 포인트 부족 (1회 ${meta.cost}P)`); return }
+    const 총비용 = 살횟수 * meta.cost
+    set초월잔여포인트(p => p - 총비용)
+    set초월스텟(prev => ({ ...prev, [stat]: prev[stat] + 살횟수 }))
   }
 
   // ============================================
@@ -1866,7 +1965,7 @@ export default function App() {
     set업그레이드({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
     set캐릭레벨(1); set경험치(0); set잔여포인트(0)
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
-    set초월스텟({ 추가초월확률: 0, 강화51_53: 0, 업그51_56: 0, 공격57_59: 0, 융합56: 0, 보스데미지: 0 })
+    set초월스텟({ ...초기초월스텟 })
     set각성의보석(0); setExPoint(0); set은하조각(0); set자각보주(0)
     // 패시브: 타격수 50% 유지
     const 타격수유지 = (환생패시브['타격수유지'] ?? 0) > 0
@@ -2211,7 +2310,7 @@ export default function App() {
     set업그레이드({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
     set캐릭레벨(1); set경험치(0); set잔여포인트(0)
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
-    set초월스텟({ 추가초월확률: 0, 강화51_53: 0, 업그51_56: 0, 공격57_59: 0, 융합56: 0, 보스데미지: 0 })
+    set초월스텟({ ...초기초월스텟 })
     set각성의보석(0); setExPoint(0); set은하조각(0); set자각보주(0)
     set타격수획득idx(0); setExtraVI받음(0); setExtraXI받음(0)
     set명칭크리스탈({ ...초기명칭크리스탈 })
@@ -2439,7 +2538,7 @@ export default function App() {
           // 티어별 DPS (마린)
           const 티어DPS = 사냥터마린들
             .filter(m => 사냥터티어(m.lv) === mb.티어)
-            .reduce((s, m) => s + 공격력(m.lv, 초월스텟.업그51_56, 초월스텟.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
+            .reduce((s, m) => s + 공격력(m.lv, 초월스텟, 일반스텟.유닛공업) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
           return (
             <View key={mb.id} pointerEvents="none">
               <View style={[styles.enemy, {
@@ -2661,44 +2760,26 @@ export default function App() {
             </TouchableOpacity>
           </View>
           <ScrollView style={{ maxHeight: 360 }}>
-            {/* 일반 스텟 */}
-            {스텟탭 === '일반' && (() => {
-              const canUp = 잔여포인트 > 0
-              const 일반목록: { key: keyof 강화스텟; label: string; 효과: string }[] = [
-                { key: '돈수급량',      label: '💰 돈 수급량',       효과: `자원 +${일반스텟.돈수급량 * 3}%` },
-                { key: '유닛공업',      label: '⚔️ 유닛 공격력',     효과: `공격 +${일반스텟.유닛공업 * 5}%` },
-                { key: '가산1강',       label: '🔨 +1강 확률',        효과: `+${(일반스텟.가산1강 * 0.1).toFixed(1)}%` },
-                { key: '가산2강',       label: '🔨 +2강 확률',        효과: `+${(일반스텟.가산2강 * 0.1).toFixed(1)}%` },
-                { key: '가산3강',       label: '🔨 +3강 확률',        효과: `+${(일반스텟.가산3강 * 0.1).toFixed(1)}%` },
-                { key: '특수강화',      label: '⚡ 특수강화 확률',    효과: `+${(일반스텟.특수강화 * 0.1).toFixed(1)}%` },
-                { key: '가산1강2',      label: '🔩 +1강 확률 (2)',     효과: `+${(일반스텟.가산1강2 * 0.1).toFixed(1)}%` },
-                { key: '가산2강2',      label: '🔩 +2강 확률 (2)',     효과: `+${(일반스텟.가산2강2 * 0.1).toFixed(1)}%` },
-                { key: '가산3강2',      label: '🔩 +3강 확률 (2)',     효과: `+${(일반스텟.가산3강2 * 0.1).toFixed(1)}%` },
-                { key: '특수강화2',     label: '⚡ 특수강화 (2)',      효과: `+${(일반스텟.특수강화2 * 0.1).toFixed(1)}%` },
-                { key: '특수파괴방지',  label: '🛡️ 파괴방지',         효과: `+${(일반스텟.특수파괴방지 * 0.1).toFixed(1)}%` },
-                { key: '특수파괴방지2', label: '🛡️ 파괴방지 (2)',      효과: `+${(일반스텟.특수파괴방지2 * 0.1).toFixed(1)}%` },
-                { key: '가산44강',      label: '🌟 44강 확률',         효과: `+${(일반스텟.가산44강 * 0.1).toFixed(1)}%` },
-                { key: '가산45강',      label: '🌟 45강 확률',         효과: `+${(일반스텟.가산45강 * 0.1).toFixed(1)}%` },
-                { key: '가산46강',      label: '🌟 46강 확률',         효과: `+${(일반스텟.가산46강 * 0.1).toFixed(1)}%` },
-                { key: '가산47강',      label: '🌟 47강 확률',         효과: `+${(일반스텟.가산47강 * 0.1).toFixed(1)}%` },
-                { key: '가산48강',      label: '💎 48강 확률',         효과: `+${(일반스텟.가산48강 * 0.05).toFixed(2)}%` },
-              ]
-              return 일반목록.map(({ key, label, 효과 }) => {
-                const val = 일반스텟[key]
-                return (
-                  <View key={key} style={styles.statRow2}>
-                    <Text style={styles.statLabel}>{label}</Text>
-                    <Text style={styles.statVal}>{val} <Text style={{ color: '#aaa', fontSize: 9 }}>({효과})</Text></Text>
-                    <TouchableOpacity style={[styles.statBtn, !canUp && styles.statBtnOff]} onPress={() => 스탯올리기(key)}>
-                      <Text style={styles.statBtnText}>+</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.statBtn, { backgroundColor: canUp ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 스탯올리기(key, 잔여포인트)}>
-                      <Text style={[styles.statBtnText, { color: canUp ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
-                    </TouchableOpacity>
-                  </View>
-                )
-              })
-            })()}
+            {/* 일반 스텟 — 메타 기반 (max/cost) */}
+            {스텟탭 === '일반' && 일반스텟표.map(meta => {
+              const val = 일반스텟[meta.key]
+              const maxed = val >= meta.max
+              const ok = !maxed && 잔여포인트 >= meta.cost
+              return (
+                <View key={meta.key} style={styles.statRow2}>
+                  <Text style={styles.statLabel}>{meta.label}</Text>
+                  <Text style={styles.statVal}>
+                    {val}/{meta.max} <Text style={{ color: '#aaa', fontSize: 9 }}>({meta.효과(val)} · {meta.cost}P)</Text>
+                  </Text>
+                  <TouchableOpacity style={[styles.statBtn, !ok && styles.statBtnOff]} onPress={() => 스탯올리기(meta.key, 1)}>
+                    <Text style={styles.statBtnText}>{maxed ? 'MAX' : '+'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.statBtn, { backgroundColor: ok ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 스탯올리기(meta.key, 999999)}>
+                    <Text style={[styles.statBtnText, { color: ok ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
+                  </TouchableOpacity>
+                </View>
+              )
+            })}
             {/* 보주 탭 (응무조로 구입) */}
             {스텟탭 === '보주' && (() => {
               return (
@@ -2792,37 +2873,28 @@ export default function App() {
                     🔒 초월 스텟은 51강 달성 시 초월 포인트를 획득합니다{'\n'}현재 초월레벨: {초월레벨} (포인트: {초월잔여포인트})
                   </Text>
                 ) : (
-                  (() => {
-                    const canUp = 초월잔여포인트 > 0
-                    const 초월목록: { key: keyof typeof 초월스텟; label: string; 효과: string }[] = [
-                      { key: '추가초월확률', label: '🌀 추가 초월확률',  효과: `+${(초월스텟.추가초월확률 * 0.001).toFixed(3)}%` },
-                      { key: '강화51_53',   label: '⚡ 51~53강 강화확률', 효과: `+${(초월스텟.강화51_53 * 2).toFixed(1)}%p` },
-                      { key: '업그51_56',   label: '⚔️ 51~56강 공격력업', 효과: `+${초월스텟.업그51_56 * 9}` },
-                      { key: '공격57_59',   label: '💥 57~59강 공격력', 효과: `+${초월스텟.공격57_59 * 8}` },
-                      { key: '융합56',      label: '🔮 56강 융합확률', 효과: `+${(초월스텟.융합56 * 1).toFixed(1)}%p` },
-                      { key: '보스데미지',  label: '👹 보스 데미지', 효과: `+${(초월스텟.보스데미지 * 10).toFixed(0)}%` },
-                    ]
-                    return (
-                      <>
-                        <Text style={{ color: '#a855f7', fontSize: 11, marginBottom: 6 }}>🌀 초월레벨 {초월레벨} · 초월 포인트 {초월잔여포인트}</Text>
-                        {초월목록.map(({ key, label, 효과 }) => {
-                          const val = 초월스텟[key]
-                          return (
-                            <View key={key} style={styles.statRow2}>
-                              <Text style={styles.statLabel}>{label}</Text>
-                              <Text style={styles.statVal}>{val} <Text style={{ color: '#aaa', fontSize: 9 }}>({효과})</Text></Text>
-                              <TouchableOpacity style={[styles.statBtn, !canUp && styles.statBtnOff]} onPress={() => 초월스탯올리기(key)}>
-                                <Text style={styles.statBtnText}>+</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity style={[styles.statBtn, { backgroundColor: canUp ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 초월스탯올리기(key, 초월잔여포인트)}>
-                                <Text style={[styles.statBtnText, { color: canUp ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )
-                        })}
-                      </>
-                    )
-                  })()
+                  <>
+                    <Text style={{ color: '#a855f7', fontSize: 11, marginBottom: 6 }}>🌀 초월레벨 {초월레벨} · 초월 포인트 {초월잔여포인트}</Text>
+                    {초월스텟표.map(meta => {
+                      const val = 초월스텟[meta.key]
+                      const maxed = val >= meta.max
+                      const ok = !maxed && 초월잔여포인트 >= meta.cost
+                      return (
+                        <View key={meta.key} style={styles.statRow2}>
+                          <Text style={styles.statLabel}>{meta.label}</Text>
+                          <Text style={styles.statVal}>
+                            {val}/{meta.max} <Text style={{ color: '#aaa', fontSize: 9 }}>({meta.효과(val)} · {meta.cost}P)</Text>
+                          </Text>
+                          <TouchableOpacity style={[styles.statBtn, !ok && styles.statBtnOff]} onPress={() => 초월스탯올리기(meta.key, 1)}>
+                            <Text style={styles.statBtnText}>{maxed ? 'MAX' : '+'}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={[styles.statBtn, { backgroundColor: ok ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 초월스탯올리기(meta.key, 999999)}>
+                            <Text style={[styles.statBtnText, { color: ok ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )
+                    })}
+                  </>
                 )}
               </>
             )}
