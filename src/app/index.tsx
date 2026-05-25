@@ -337,11 +337,13 @@ function 다음경험치(lv: number): number {
   return Math.round(100 * lv * lv)
 }
 
-const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32] as const
+const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46] as const
 const 생산비용표: Record<number, number> = {
   1: 1500, 7: 40000, 11: 700000, 15: 8000000,
   18: 100000000, 20: 600000000, 22: 3500000000, 24: 20000000000,
   26: 100000000000, 28: 600000000000, 30: 3500000000000, 32: 20000000000000,
+  34: 1.2e14, 36: 8e14, 37: 6e15, 38: 5e16, 39: 8e17, 40: 1e19,
+  41: 6e19, 42: 4e20, 43: 2.5e21, 44: 1.5e22, 45: 1e23, 46: 5e23,
 }
 function 생산비용(강도: number): number {
   return 생산비용표[강도] ?? Number.MAX_SAFE_INTEGER
@@ -1087,6 +1089,7 @@ export default function App() {
   const [환생패시브, set환생패시브] = useState<Record<string, number>>({})
   const [환생패널열림, set환생패널열림] = useState(false)
   const [재화패널열림, set재화패널열림] = useState(false)
+  const [생산배수, set생산배수] = useState<number>(1)
   // 신규 재화 (원본 맵 기반)
   // 각성의 보석: 보스/뽑기에서 드랍, 추가 Ex스탯 포인트 교환에 사용
   const [각성의보석, set각성의보석] = useState(0)
@@ -1736,12 +1739,13 @@ export default function App() {
               const dmg = 공격력(n.lv, 초월s, 스텟.유닛공업) * 공격력배수 * 연타수(n.lv) * (isCrit ? 2 : 1)
               // 사냥터 단가 (xlsx 신규): Lv1=1원/dmg, Lv2=10만원/dmg, Lv3=100억원/dmg × 단수배율
               const tier = target.티어
-              const 단가_base = tier === 1 ? 1 : tier === 2 ? 100000 : 10000000000
+              // 단가 조정: Lv1=1, Lv2=1만, Lv3=10억 (밸런스 — 10배 감소)
+              const 단가_base = tier === 1 ? 1 : tier === 2 ? 10000 : 1000000000
               const 단가 = tier === 3 ? 단가_base * Lv3단수배율 : 단가_base
               추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여
-              // 사냥터 3 (광산) → 크레딧 + 돈 동시 획득 (돈은 위에서 이미 가산)
+              // 사냥터 3 (광산) → 크레딧 + 돈 동시 획득
               if (tier === 3) {
-                추가크레딧 += Math.max(1, Math.floor(dmg / 100))
+                추가크레딧 += Math.max(1, Math.floor(dmg / 1000))
               }
               // 타격수: 41강+ 데미지 그대로, 미만은 +1
               추가공격수 += n.lv >= 41 ? Math.round(dmg) : 1
@@ -1867,7 +1871,7 @@ export default function App() {
       // 고유유닛 DPS 기여 (사냥터 배치 상시 적용)
       if (고유DPS > 0) {
         const 고유티어 = 고유유닛스텟cur.위치
-        const 고유단가_base = 고유티어 === 1 ? 1 : 고유티어 === 2 ? 100000 : 10000000000
+        const 고유단가_base = 고유티어 === 1 ? 1 : 고유티어 === 2 ? 10000 : 1000000000
         const 고유단가 = 고유티어 === 3 ? 고유단가_base * Lv3단수배율 : 고유단가_base
         추가미네랄 += 고유DPS * 고유단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * dt
       }
@@ -2293,6 +2297,22 @@ export default function App() {
     set크레딧(prev => prev - 비용)
     set고유유닛(prev => ({ ...prev, [stat]: (prev[stat] as number) + 1 }))
   }
+  // MAX까지 가능한 만큼 일괄 강화
+  function 고유유닛강화MAX(stat: keyof Omit<고유유닛스텟, '위치'>) {
+    let lv = 고유유닛Ref.current[stat] as number
+    const 상한 = 고유유닛상한[stat]
+    let 잔여 = 크레딧Ref.current
+    let 산횟수 = 0, 총비용 = 0
+    while (lv < 상한) {
+      const c = 고유유닛강화비용표[stat](lv)
+      if (잔여 < c) break
+      잔여 -= c; 총비용 += c; lv++; 산횟수++
+    }
+    if (산횟수 < 1) { 메시지표시(`💰 크레딧 부족`); return }
+    set크레딧(prev => prev - 총비용)
+    set고유유닛(prev => ({ ...prev, [stat]: (prev[stat] as number) + 산횟수 }))
+    메시지표시(`${stat} +${산횟수} (💰${숫자포맷(총비용)})`)
+  }
   // 고유유닛 사냥터 1 고정 (사2/사3 진입 X)
   function 고유유닛위치변경() {
     // 수동 cycle 폐기 (자동 라우팅으로 대체) — 호출시 안내만
@@ -2360,22 +2380,28 @@ export default function App() {
 
 
 
-  function 유닛구매(강도: number) {
-    const 비용 = 생산비용(강도)
+  function 유닛구매(강도: number, 수량: number = 1) {
+    const 단가 = 생산비용(강도)
     const 총마린수 = 마린들Ref.current.length
     if (총마린수 >= 200) { 메시지표시('🚫 마린 가득참 (총 200 최대)'); return }
-    const baseCount = 마린들Ref.current.filter(m => m.location === 'base').length
-    if (mineralRef.current < 비용) {
-      메시지표시(`⚠️ 자원 부족 (${숫자포맷(비용)} 필요)`)
+    const 여유 = 200 - 총마린수
+    const 가능자원 = Math.floor(mineralRef.current / 단가)
+    const 실수량 = Math.min(수량, 여유, 가능자원)
+    if (실수량 < 1) {
+      메시지표시(`⚠️ 자원/슬롯 부족 (${숫자포맷(단가)}/마리)`)
       return
     }
-    setMineral(prev => prev - 비용)
+    const 총비용 = 단가 * 실수량
+    setMineral(prev => prev - 총비용)
     set마린들(prev => {
-      const bc = prev.filter(m => m.location === 'base').length
-      const 새 = 새마린(강도, 베이스시작위치(bc), 'base')
-      return [...prev, 새]
+      let bc = prev.filter(m => m.location === 'base').length
+      const 추가: 마린[] = []
+      for (let i = 0; i < 실수량; i++) {
+        추가.push(새마린(강도, 베이스시작위치(bc + i), 'base'))
+      }
+      return [...prev, ...추가]
     })
-    메시지표시(`✓ ${강도}강 마린 생산!`)
+    메시지표시(`✓ ${강도}강 마린 ×${실수량} 생산!`)
   }
 
   // 고유유닛 사냥터 1 고정 (자동 라우팅 제거)
@@ -3379,12 +3405,22 @@ export default function App() {
                       <Text style={styles.upgLabel}>{이모지} {stat} <Text style={{ color: '#f5a623' }}>Lv.{lv}/{상한}</Text></Text>
                       <Text style={styles.upgEffect}>{설명}</Text>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 70 }]}
-                      onPress={() => 고유유닛강화(stat)}
-                    >
-                      <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `💰${숫자포맷(비용)}`}</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 3 }}>
+                      <TouchableOpacity
+                        style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 70 }]}
+                        onPress={() => 고유유닛강화(stat)}
+                      >
+                        <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `💰${숫자포맷(비용)}`}</Text>
+                      </TouchableOpacity>
+                      {!maxed && (
+                        <TouchableOpacity
+                          style={[styles.upgBtn, { backgroundColor: '#7ed957', minWidth: 50, paddingHorizontal: 4 }]}
+                          onPress={() => 고유유닛강화MAX(stat)}
+                        >
+                          <Text style={[styles.upgBtnText, { color: '#000', fontSize: 10 }]}>MAX</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 )
               })}
@@ -3396,7 +3432,7 @@ export default function App() {
       {/* 🌟 환생 패널 */}
       {환생패널열림 && (() => {
         const chk = 환생가능여부()
-        const 보상 = 환생보상크레딧()
+        const 보상 = 환생보상ExPoint()
         return (
           <View style={styles.prodPanel}>
             <View style={styles.prodHeader}>
@@ -3546,19 +3582,32 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.prodSubtitle}>강도를 선택하여 마린을 구매하세요</Text>
+          <Text style={styles.prodSubtitle}>강도 선택 → 구매. 배수 토글로 일괄 구매 가능</Text>
+          {/* 배수 선택 */}
+          <View style={{ flexDirection: 'row', gap: 4, marginBottom: 6 }}>
+            {[1, 5, 10].map(n => (
+              <TouchableOpacity
+                key={n}
+                style={[styles.statTabBtn, 생산배수 === n && styles.statTabBtnOn]}
+                onPress={() => set생산배수(n)}
+              >
+                <Text style={[styles.statTabText, 생산배수 === n && { color: '#000' }]}>×{n}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <View style={styles.prodGrid}>
             {생산강도목록.map(강도 => {
-              const 비용 = 생산비용(강도)
-              const 가능 = mineral >= 비용
+              const 단가 = 생산비용(강도)
+              const 총 = 단가 * 생산배수
+              const 가능 = mineral >= 단가
               return (
                 <TouchableOpacity
                   key={강도}
                   style={[styles.prodBtn, !가능 && styles.prodBtnDisabled]}
-                  onPress={() => 유닛구매(강도)}
+                  onPress={() => 유닛구매(강도, 생산배수)}
                 >
-                  <Text style={styles.prodBtnLv}>+{강도}</Text>
-                  <Text style={styles.prodBtnCost}>{숫자포맷(비용)}</Text>
+                  <Text style={styles.prodBtnLv}>+{강도}{생산배수 > 1 ? ` ×${생산배수}` : ''}</Text>
+                  <Text style={styles.prodBtnCost}>{숫자포맷(총)}</Text>
                 </TouchableOpacity>
               )
             })}
