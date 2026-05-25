@@ -1744,12 +1744,19 @@ export default function App() {
     set마린들(prev => prev.map(m =>
       선택IDRef.current.includes(m.id) ? { ...m, state: 'move', dest: c, 타겟적id: null } : m
     ))
+    // 고유유닛도 선택 상태면 같이 이동 (현재 사냥터 화면에 있을 때만)
+    if (고유유닛선택Ref.current && is사냥터(현재화면Ref.current as 화면)) {
+      set고유유닛dest(c)
+    }
   }
   function 공격이동명령(목적: Pos) {
     const c = clampPosStatic(목적)
     set마린들(prev => prev.map(m =>
       선택IDRef.current.includes(m.id) ? { ...m, state: 'attack-move', dest: c, 타겟적id: null } : m
     ))
+    if (고유유닛선택Ref.current && is사냥터(현재화면Ref.current as 화면)) {
+      set고유유닛dest(c)
+    }
   }
   function 공격명령(적id: number) {
     set마린들(prev => prev.map(m =>
@@ -2168,6 +2175,13 @@ export default function App() {
           m.location === 현재화면Ref.current && 점이사각형안에(m.pos, x1, y1, x2, y2)
         )
         set선택ID(inBox.map(m => m.id))
+        // 사냥터 화면에서 드래그 박스가 고유유닛 위치 덮으면 고유유닛도 같이 선택
+        const screen = 현재화면Ref.current
+        if (is사냥터(screen as 화면) && 점이사각형안에(고유유닛posRef.current, x1, y1, x2, y2)) {
+          set고유유닛선택(true)
+        } else {
+          set고유유닛선택(false)
+        }
       }
     },
   }
@@ -3018,6 +3032,9 @@ export default function App() {
             <Text style={styles.prodSubtitle}>누적 환생: {누적환생수}회 · 💰 {숫자포맷(크레딧)}</Text>
             <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
               조건: 60강 마린 보유 + 초월레벨 ≥ 10
+            </Text>
+            <Text style={[styles.prodSubtitle, { color: '#f5a623', fontSize: 11 }]}>
+              💡 환생 보상은 💰크레딧으로 지급 → 🦸고유유닛 강화에 사용
             </Text>
             <Text style={[styles.prodSubtitle, { color: chk.ok ? '#7ed957' : '#ff6b6b' }]}>
               {chk.ok ? `✓ 환생 가능 — 보상 💰 ${숫자포맷(보상)}` : `✗ ${chk.이유}`}
