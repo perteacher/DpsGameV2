@@ -2609,30 +2609,46 @@ export default function App() {
           )
         })}
 
-        {/* BOSS: 보스 1마리 (큰 크기, HP X) */}
+        {/* BOSS: 6단계까지 일반 보스, 7부터 Extra Boss (타격수 진행) */}
         {현재화면 === 'boss' && 적들.map(e => {
           const flash = e.flashUntil > now
+          const extra = 보스처치수 >= 6
           const gate = 보스DPS게이트(보스처치수 + 1)
           const ok = 사냥터DPS >= gate
+          // Extra Boss 모드: 타격수 다음 마일스톤 진행률
+          const 다음마일 = extra && 타격수획득idx < 타격마일스톤표.length ? 타격마일스톤표[타격수획득idx] : null
+          const 마일진행 = 다음마일 ? Math.min(100, (총공격수 / 다음마일.임계값) * 100) : 0
           return (
             <View key={e.id} pointerEvents="none">
               <View style={[styles.enemy, {
                 left: e.pos.x - 보스_크기 / 2,
                 top: e.pos.y - 보스_크기 / 2,
-                backgroundColor: flash ? '#ff6b6b' : '#5a2a2a',
+                backgroundColor: flash ? '#ff6b6b' : extra ? '#4a1a5a' : '#5a2a2a',
                 width: 보스_크기, height: 보스_크기, borderRadius: 보스_크기 / 2,
+                borderWidth: extra ? 3 : 0, borderColor: '#a855f7',
               }]}>
-                <Text style={{ fontSize: 68 }}>👹</Text>
+                <Text style={{ fontSize: 68 }}>{extra ? '🌌' : '👹'}</Text>
               </View>
-              <Text style={[styles.bossLabel, { left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 50, width: 200 }]}>
-                👹 보스 {보스처치수 + 1}
+              <Text style={[styles.bossLabel, { left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 50, width: 200, color: extra ? '#a855f7' : '#fff' }]}>
+                {extra ? `🌌 Extra Boss` : `👹 보스 ${보스처치수 + 1}`}
               </Text>
-              <Text style={[styles.bossLabel, {
-                left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 34, width: 200,
-                color: ok ? '#7ed957' : '#ccc', fontSize: 10,
-              }]}>
-                DPS {숫자포맷(사냥터DPS)} / {숫자포맷(gate)} {ok ? '✓ 클리어 중' : '✗ DPS 부족'}
-              </Text>
+              {extra ? (
+                <Text style={[styles.bossLabel, {
+                  left: e.pos.x - 120, top: e.pos.y - 보스_크기 / 2 - 34, width: 240,
+                  color: '#f5a623', fontSize: 10,
+                }]}>
+                  {다음마일
+                    ? `${다음마일.라벨} 진행 ${마일진행.toFixed(1)}% (${숫자포맷(총공격수)}/${숫자포맷(다음마일.임계값)})`
+                    : `🏆 모든 타격수 마일스톤 완료!`}
+                </Text>
+              ) : (
+                <Text style={[styles.bossLabel, {
+                  left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 34, width: 200,
+                  color: ok ? '#7ed957' : '#ccc', fontSize: 10,
+                }]}>
+                  DPS {숫자포맷(사냥터DPS)} / {숫자포맷(gate)} {ok ? '✓ 클리어 중' : '✗ DPS 부족'}
+                </Text>
+              )}
             </View>
           )
         })}
