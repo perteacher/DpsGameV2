@@ -208,14 +208,14 @@ const 강도표: Record<number, 강도스펙> = {
   60: { base: 0,         upg: 0,       속도: '보통',    연타: 1 },  // 미정
 }
 
-// 공속 단계 → atk/s (cooldown 역수)
+// 공속 단계 → atk/s (cooldown 역수, 전체 2배 빠르게 적용)
 const _공속맵: Record<string, number> = {
-  '매우느림': 1 / 2.5,   // 0.40
-  '느림':     1 / 1.8,   // 0.56
-  '보통':     1 / 1.2,   // 0.83
-  '빠름':     1 / 0.8,   // 1.25
-  '극한':     1 / 0.5,   // 2.00
-  '초월':     1 / 0.3,   // 3.33
+  '매우느림': 1 / 1.25,   // 0.80
+  '느림':     1 / 0.9,    // 1.11
+  '보통':     1 / 0.6,    // 1.67
+  '빠름':     1 / 0.4,    // 2.50
+  '극한':     1 / 0.25,   // 4.00
+  '초월':     1 / 0.15,   // 6.67
 }
 
 function 공격력(단계: number, 초월업51_56: number = 0, 초월공57_59: number = 0, 유닛공업: number = 0) {
@@ -963,10 +963,11 @@ export default function App() {
   const _보주공속r = 보주합산(보주, '공속')
   const _보주자원r = 보주합산(보주, '자원')
   const _보주배수r = 보주합산(보주, '배수')
-  const _공격력배수r = (1 + _보주공격r + 업그레이드.공격력 * 0.03)
+  const _보스공격력보너스r = 1 + Math.min(보스처치수, 6) * 0.5  // 보스1=×1.5 ... 보스6=×4
+  const _공격력배수r = (1 + _보주공격r + 업그레이드.공격력 * 0.03) * _보스공격력보너스r
   const _공속배수r = 1 + _보주공속r + 업그레이드.공속 * 0.02
   const _크리r = Math.min(0.95, _보주크리r)
-  const 사냥터캡 = 8 + 보스처치수 * 4
+  const 사냥터캡 = 12 + Math.min(보스처치수, 6) * 6  // 12 → 보스당 +6 → 최대 48
   const 보스존캡 = 8
   const _초월r = 초월스텟
   const 사냥터DPS = 보스존마린들.filter(m => m.state === 'attacking').reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
@@ -1141,12 +1142,13 @@ export default function App() {
       const 고유유닛스텟cur = 고유유닛Ref.current
       const 고유DPS = 고유유닛DPS(고유유닛스텟cur)
       const 초월lv = 초월레벨Ref.current
-      const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05)
+      const 보스공격력보너스 = 1 + Math.min(보스처치수Ref.current, 6) * 0.5  // 보스1=×1.5 ... 보스6=×4
+      const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05) * 보스공격력보너스
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
       const 속도 = Math.min(450, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
       const 보스존캡 = 8
-      const 사냥터캡 = 8 + 보스처치수Ref.current * 4
+      const 사냥터캡 = 12 + Math.min(보스처치수Ref.current, 6) * 6
       const 평균크리 = Math.min(0.95, 보주크리)
       const 초월s = 초월스텟Ref.current
       const 효과DPS = (lv: number) => 공격력(lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 공격속도(lv) * 공속배수 * 연타수(lv) * (1 + 평균크리)
@@ -1680,11 +1682,14 @@ export default function App() {
       if (플래시적.length > 0) {
         set적들(prev => prev.map(e => 플래시적.includes(e.id) ? { ...e, flashUntil: now + 150 } : e))
       }
-      // 보스 DPS gate 통과 시 처치 (슬롯+4, 보주 드랍, 크리스탈조각)
-      if (huntingDPS >= 보스게이트 && now - 보스킬쿨다운Ref.current >= 2000) {
+      // 보스 DPS gate 통과 시 처치 (6단계까지만, 7부터는 Extra Boss 모드)
+      if (보스처치수Ref.current < 6 && huntingDPS >= 보스게이트 && now - 보스킬쿨다운Ref.current >= 2000) {
         보스킬쿨다운Ref.current = now
         const baseN = 보스처치수Ref.current
         set보스처치수(prev => prev + 1)
+        // 🔥 보스 클리어 → 일반레벨 +2000 (잔여포인트도 +2000)
+        set캐릭레벨(prev => prev + 2000)
+        set잔여포인트(prev => prev + 2000)
         if (Platform.OS !== 'web') Vibration.vibrate([0, 100, 50, 100])
         // 환생 패시브: 보스 보상 배수
         const _보스배수 = 1 + (환생패시브['보스보상'] ?? 0) * 0.5
@@ -1720,7 +1725,13 @@ export default function App() {
           setExPoint(prev => prev + 2500)
           메시지표시(`🎊 Extra LV. XI (${회}회차) 클리어! 💠+100 💰+200만 ⭐+2500`)
         }
-        메시지표시(`⚔️ 보스 ${baseN + 1} 클리어! 사냥터+4 🔮+${조각드랍}`)
+        const 새보스 = baseN + 1
+        const 새배수 = 1 + Math.min(새보스, 6) * 0.5
+        if (새보스 >= 6) {
+          메시지표시(`🌌 6보스 전체 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+2000 · Extra Boss 모드 진입! (타격수 마일스톤으로 보상)`)
+        } else {
+          메시지표시(`⚔️ 보스 ${새보스} 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+2000 · 사냥터+6 🔮+${조각드랍}`)
+        }
       }
       if (화면전환target && 현재화면Ref.current === 'base') {
         set현재화면(화면전환target)
