@@ -41,7 +41,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true,
-      "baseUrl": "/DpsGame/"
+      "baseUrl": "/DpsGameV2/"
     }
   }
 }
