@@ -735,7 +735,7 @@ const 초기보석: 보석목록 = { 하급: 0, 중급: 0, 상급: 0, 특급: 0,
 
 const 보석구입비용: Record<보석타입, number> = {
   하급: 1, 중급: 1, 상급: 1, 특급: 1, 고급: 1,
-  재물: 1, 경험보석: 2, 보호보석: 100, 궁극: 100,
+  재물: 100, 경험보석: 2, 보호보석: 100, 궁극: 100,
   채광: 10000, 수호: 5000000, 초월보석: 4000000,
   자동화: 100000000, 인내: 1000000000000,
   강타: 1500,
@@ -1090,6 +1090,7 @@ export default function App() {
   const [환생패널열림, set환생패널열림] = useState(false)
   const [재화패널열림, set재화패널열림] = useState(false)
   const [자동구입배수, set자동구입배수] = useState<number>(1)
+  const [내부계산모드, set내부계산모드] = useState(false)  // 렌더 OFF → 렉 해소
   // 신규 재화 (원본 맵 기반)
   // 각성의 보석: 보스/뽑기에서 드랍, 추가 Ex스탯 포인트 교환에 사용
   const [각성의보석, set각성의보석] = useState(0)
@@ -1208,7 +1209,7 @@ export default function App() {
   const _공격력배수r = (1 + _보주공격r + 업그레이드.공격력 * 0.03) * _보스공격력보너스r
   const _공속배수r = 1 + _보주공속r + 업그레이드.공속 * 0.02
   const _크리r = Math.min(0.95, _보주크리r)
-  const 사냥터캡 = Math.min(48, 12 + 보스처치수 * 4)  // 12 시작 → 보스당 +4 → 최대 48
+  const 사냥터캡 = Math.min(48, 8 + 보스처치수 * 4)  // 8 시작 → 보스당 +4 → 최대 48 (1+2+3 합산)
   const 보스존캡 = 8
   const _초월r = 초월스텟
   const _일반공업r = 일반스텟.유닛공업
@@ -1460,6 +1461,24 @@ export default function App() {
       const 융합소모IDs = new Set<number>()  // 이 tick에서 융합으로 제거될 55강 마린들
       let 융합시도수행 = false  // tick당 1회만
       const 판매수집: { lv: number }[] = []
+      // 판매 크레딧 비용 (강도별)
+      const 판매크레딧비용Pre = (lv: number): number => {
+        if (lv >= 41 && lv <= 44) return 100
+        if (lv >= 45 && lv <= 48) return 1e6
+        if (lv === 49) return 1e7
+        if (lv === 50) return 1e8
+        if (lv === 52) return 1e12
+        if (lv === 53) return 1e13
+        if (lv === 54) return 1e14
+        if (lv === 55) return 1e15
+        if (lv === 56) return 1e16
+        if (lv === 57) return 1e19
+        if (lv === 58) return 1e20
+        if (lv === 59) return 1e21
+        if (lv === 60) return 1e28
+        return 0
+      }
+      let 가용크레딧Tick = 크레딧Ref.current
       let 화면전환target: 화면 | null = null
 
       function processBaseZones(m: 마린): 마린 {
@@ -1490,10 +1509,12 @@ export default function App() {
         // 사냥터 입구 (cap = 사냥터캡, 강도별 사냥터 1/2/3 자동 라우팅)
         if (점이구역안에(m.pos, ZONE_사냥터입구)) {
           const 목표loc: 유닛위치 = 사냥화면(m.lv)
+          // 사냥터 1+2+3 합산 cap (사냥터캡)
+          const 합산수 = (기존사냥1수 + 사냥1추가) + (기존사냥2수 + 사냥2추가) + (기존사냥3수 + 사냥3추가)
           const 기존수 = 목표loc === 'hunting1' ? 기존사냥1수 + 사냥1추가
             : 목표loc === 'hunting2' ? 기존사냥2수 + 사냥2추가
             : 기존사냥3수 + 사냥3추가
-          if (기존수 < 사냥터캡) {
+          if (합산수 < 사냥터캡) {
             const 새m = {
               ...m,
               location: 목표loc,
@@ -1522,8 +1543,17 @@ export default function App() {
             }
             return { ...m, state: 'idle', dest: null }
           }
+          // 크레딧 검증 — 부족하면 판매 취소 (마린 보존)
+          const _cost = 판매크레딧비용Pre(m.lv)
+          if (가용크레딧Tick < _cost) {
+            if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 2000) {
+              메시지표시(`💰 크레딧이 부족합니다 (${숫자포맷(_cost)} 필요)`)
+            }
+            return { ...m, state: 'idle', dest: null }
+          }
+          가용크레딧Tick -= _cost
           판매수집.push({ lv: m.lv })
-          return { ...m, id: -1 }  // 마킹: 제거 대상
+          return { ...m, id: -1 }  // 제거 대상
         }
         // 강화소 체크 (자동 강화 — 비용 없음)
         if (점이구역안에(m.pos, ZONE_강화) && now - m.마지막강화시간 >= 강화쿨다운) {
@@ -1696,7 +1726,7 @@ export default function App() {
               const 보스데미지배수 = 1  // 신규 초월스텟에 보스데미지 없음 (보스공격력보너스로 대체됨)
               const dmgShow = Math.round(공격력(n.lv, 초월s, 스텟.유닛공업) * 공격력배수 * 보스데미지배수 * 연타수(n.lv) * (isCrit ? 2 : 1))
               // 타격수: 41강+ 데미지 그대로 반영, 미만은 +1
-              추가공격수 += n.lv >= 41 ? dmgShow : 1
+              추가공격수 += n.lv >= 51 ? dmgShow : 1
               if (Math.random() < 0.4) {
                 const fid = dmgIdRef.current++
                 setDmg플로팅들(prev => [...prev.slice(-20), {
@@ -1750,7 +1780,7 @@ export default function App() {
                 추가크레딧 += Math.max(1, Math.floor(dmg / 1000))
               }
               // 타격수: 41강+ 데미지 그대로, 미만은 +1
-              추가공격수 += n.lv >= 41 ? Math.round(dmg) : 1
+              추가공격수 += n.lv >= 51 ? Math.round(dmg) : 1
               플래시몹.push(target.id)
               몹데미지맵.set(target.id, (몹데미지맵.get(target.id) ?? 0) + dmg)
             }
@@ -1815,27 +1845,8 @@ export default function App() {
       const 장착세트 = new Set(장착크리스탈Ref.current)
       const eqCnt = (k: keyof 명칭크리스탈목록): number => 장착세트.has(k) ? (명칭크리스탈Ref.current[k] as number) : 0
       const 각성배수 = 1 + eqCnt('각성') * 1.0 + eqCnt('노랑') * 1.0 + eqCnt('우주') * 5.0
-      // 판매 크레딧 비용 (강도별, 사용자 제공)
-      const 판매크레딧비용 = (lv: number): number => {
-        if (lv >= 41 && lv <= 44) return 100
-        if (lv >= 45 && lv <= 48) return 1e6
-        if (lv === 49) return 1e7
-        if (lv === 50) return 1e8
-        if (lv === 52) return 1e12
-        if (lv === 53) return 1e13
-        if (lv === 54) return 1e14
-        if (lv === 55) return 1e15
-        if (lv === 56) return 1e16
-        if (lv === 57) return 1e19
-        if (lv === 58) return 1e20
-        if (lv === 59) return 1e21
-        if (lv === 60) return 1e28
-        return 0
-      }
-      let 총소모크레딧 = 0
-      for (const s of 판매수집) {
-        총소모크레딧 += 판매크레딧비용(s.lv)
-      }
+      // 크레딧은 이미 사전 검증됨 (판매소 진입 시점). 판매수집 = 판매 확정 마린
+      const 총소모크레딧 = 크레딧Ref.current - 가용크레딧Tick
       for (const s of 판매수집) {
         const r = 판매보상(s.lv)
         판매무색 += Math.round(r.무색조각 * 판매보상배수 * 무색배수)
@@ -2417,6 +2428,21 @@ export default function App() {
     if (고유유닛.위치 !== 1) set고유유닛(prev => ({ ...prev, 위치: 1 }))
   }, [고유유닛.위치])
 
+  // 30만 레벨 도달 시 초월레벨 자동 1렙 (초월시스템 unlock)
+  useEffect(() => {
+    if (캐릭레벨 >= 캐릭레벨최대 && 초월레벨 === 0) {
+      set초월레벨(1)
+      set초월잔여포인트(p => p + 1)
+      메시지표시('🌀 30만 레벨 도달! 초월레벨 1 활성화')
+    }
+  }, [캐릭레벨, 초월레벨])
+
+  // 자동화 보석 → 자동구입배수 자동 동기화 (1 + 자동화보석 수, cap 10)
+  useEffect(() => {
+    const 목표 = Math.min(10, 1 + 보석.자동화)
+    if (자동구입배수 < 목표) set자동구입배수(목표)
+  }, [보석.자동화])
+
   // 🌟 고유유닛 자동 단수업 (모든 강화 max + 각성의돌(=각성의보석) 보유시)
   useEffect(() => {
     if (!단수업가능(고유유닛)) return
@@ -2857,8 +2883,8 @@ export default function App() {
           </View>
         )}
 
-        {/* HUNTING: 현재 화면 티어의 mob만 표시 */}
-        {is사냥터(현재화면) && 몹들.filter(mb => {
+        {/* 내부 계산 모드 — 렌더 스킵 */}
+        {!내부계산모드 && is사냥터(현재화면) && 몹들.filter(mb => {
           const screenTier = 현재화면 === 'hunting1' ? 1 : 현재화면 === 'hunting2' ? 2 : 3
           return mb.티어 === screenTier
         }).map(mb => {
@@ -2925,7 +2951,7 @@ export default function App() {
         )}
 
         {/* 데미지 floating (보스존만) */}
-        {현재화면 === 'boss' && dmg플로팅들.map(d => {
+        {!내부계산모드 && 현재화면 === 'boss' && dmg플로팅들.map(d => {
           const t = Math.max(0, (d.until - now) / 900)
           return (
             <Text key={d.id} pointerEvents="none" style={{
@@ -2944,7 +2970,7 @@ export default function App() {
         })}
 
         {/* BOSS: 10단계까지. ExtraBoss 제거 */}
-        {현재화면 === 'boss' && 적들.map(e => {
+        {!내부계산모드 && 현재화면 === 'boss' && 적들.map(e => {
           const flash = e.flashUntil > now
           const gate = 보스DPS게이트(보스처치수 + 1)
           const ok = 사냥터DPS >= gate
@@ -2977,7 +3003,7 @@ export default function App() {
         )}
 
         {/* 마린 (현재 화면에 있는 마린만) */}
-        {화면마린들.map(m => {
+        {!내부계산모드 && 화면마린들.map(m => {
           const selected = 선택ID.includes(m.id)
           const flash = m.공격플래시Until > now
           return (
@@ -3509,6 +3535,17 @@ export default function App() {
             </TouchableOpacity>
           </View>
           <Text style={styles.prodSubtitle}>판매 &gt; 강화 우선. 자동구입과 자동판매는 함께 작동</Text>
+          {/* 내부 계산 모드 */}
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderLabel}>⚡ 내부계산</Text>
+            <TouchableOpacity
+              style={[styles.autoToggle, 내부계산모드 && styles.autoToggleOn]}
+              onPress={() => set내부계산모드(v => !v)}
+            >
+              <Text style={styles.autoToggleText}>{내부계산모드 ? 'ON' : 'OFF'}</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#aaa', fontSize: 10 }}>렌더 OFF → 렉 해소</Text>
+          </View>
 
           {/* 자동 강화 */}
           <View style={styles.sliderRow}>
