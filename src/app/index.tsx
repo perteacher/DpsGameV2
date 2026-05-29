@@ -317,6 +317,13 @@ function 유닛DPS(단계: number) {
   return 공격력(단계) * 공격속도(단계) * 연타수(단계)
 }
 
+// 51강+ 소득 배수: 51강 리셋된 낮은 공격력 보정 + 단계별 성장 → 50강보다 항상 더 잘 벌도록
+// (50강 소득 ∝ 공격력×공속 ≈ 65500×6.67. 51강 base=30×1.67이므로 ×50000부터 시작)
+function 소득배수(단계: number): number {
+  if (단계 < 51) return 1
+  return 50000 * Math.pow(3, 단계 - 51)
+}
+
 // DPS 단계별 자원 배수
 function 자원배수(총DPS: number): number {
   if (총DPS < 50) return 1
@@ -336,14 +343,19 @@ function 다음경험치(lv: number): number {
   // 10 * lv → lv 1: 10, lv 1000: 1만, lv 30만: 300만 (linear, 매우 부드러움)
   return Math.max(10, Math.round(10 * lv))
 }
+// 초월경험치 → 초월레벨업 필요량 (30만 레벨 도달 후). 초월lv 1당 1e6 증가
+function 다음초월경험치(초월lv: number): number {
+  return 1000000 * Math.max(1, 초월lv)
+}
 
-const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46] as const
+const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 49, 50, 51, 52, 53, 54] as const
 const 생산비용표: Record<number, number> = {
   1: 1500, 7: 40000, 11: 700000, 15: 8000000,
   18: 100000000, 20: 600000000, 22: 3500000000, 24: 20000000000,
   26: 100000000000, 28: 600000000000, 30: 3500000000000, 32: 20000000000000,
   34: 1.2e14, 36: 8e14, 37: 6e15, 38: 5e16, 39: 8e17, 40: 1e19,
   41: 6e19, 42: 4e20, 43: 2.5e21, 44: 1.5e22, 45: 1e23, 46: 5e23,
+  49: 1.5e24, 50: 5e25, 51: 1e26, 52: 5e27, 53: 1e29, 54: 5e31,
 }
 function 생산비용(강도: number): number {
   return 생산비용표[강도] ?? Number.MAX_SAFE_INTEGER
@@ -377,7 +389,7 @@ const 판매일반XP표: Record<number, number> = {
 function 판매보상(lv: number): 판매보상결과 {
   const base: 판매보상결과 = { 무색조각: 0, 응무조: 0, 크리스탈조각: 0, ExP: 0, 각성보석: 0, 은하조각: 0, 자각보주: 0, 박스: [], 일반XP: 0, 크레딧: 0, 판매불가: false }
   if (lv < 15) return base  // 14강 이하 보상 없음
-  if (lv === 51) return { ...base, 판매불가: true }
+  if (lv === 51) return { ...base, 판매불가: true }  // 51강 판매 불가 (엑셀 기준)
   // 15~44: 일반XP만
   if (lv <= 44) return { ...base, 일반XP: 판매일반XP표[lv] ?? 0 }
   // 45~50: 무색조각 기본 + 확률 (크레딧/각성/무색)
@@ -685,18 +697,18 @@ const 보주효과설명: Record<보주타입, string> = {
   힘: '57강 공격력 +10%/개',
   지위: '58강 공격력 +10%/개',
   권력: '59강 공격력 +10%/개',
-  세공: '크레딧 섬세도 증가',
+  세공: '광산 크레딧 +10%/개',
   신위: '55~59강 기본공격력 +100%/개',
   절명: '55~59강 크리 +0.1%/개',
-  풍요: '크레딧 광산 최대 채광량 +1배/개',
+  풍요: '광산 크레딧 +1배/개 (×)',
   폭식: '돈수급량 +10%/개',
   영겁: '54,55강 확률 +0.03%/개',
   명운: '56강 융합확률 +0.02%/개',
   성운: '57강 확률 +0.02%/개',
   천운: '58강 확률 +0.02%/개',
   무위: '59강 +0.001%/개, 채광력 +0.1배/개',
-  풍성: '크레딧 광산 최대 채광량 +1배/개',
-  부유: '크레딧 광산 최종 채광량 +20%/개',
+  풍성: '광산 크레딧 +1배/개 (×)',
+  부유: '광산 크레딧 +20%/개',
   무엄: '59강 확률 +0.1%/개',
   공명: '레벨업 필요경험치 -0.1%/개',
 }
@@ -747,6 +759,11 @@ const 보석max: Record<보석타입, number> = {
 }
 // 동적 비용: cost = baseCost × (1 + 보유/10)² — quadratic 성장 (밸런스 강화)
 function 보석현재비용(종류: 보석타입, 보유: number): number {
+  if (종류 === '재물') {
+    // 재물 보석: 구입 비용 증가폭 강화 — (1 + 보유/5)³ (cubic, 더 가파르게)
+    const m = 1 + 보유 / 5
+    return Math.floor(보석구입비용[종류] * m * m * m)
+  }
   const m = 1 + 보유 / 10
   return Math.floor(보석구입비용[종류] * m * m)
 }
@@ -1079,6 +1096,7 @@ export default function App() {
   // 초월레벨
   const [초월레벨, set초월레벨] = useState(0)
   const [초월잔여포인트, set초월잔여포인트] = useState(0)
+  const [초월경험치, set초월경험치] = useState(0)  // 30만 레벨 도달 후 누적 → 초월레벨업
   // 환생 시스템 (영구 — 환생시 유지)
   // 트리거: 60강 마린 보유 + 초월레벨 ≥ 10
   // 보상: 환생크레딧 (일반 크레딧과 합산) + 환생레벨 +1
@@ -1159,6 +1177,7 @@ export default function App() {
   const 고유유닛선택Ref = useRef(고유유닛선택); 고유유닛선택Ref.current = 고유유닛선택
   const 초월레벨Ref = useRef(초월레벨); 초월레벨Ref.current = 초월레벨
   const 초월잔여포인트Ref = useRef(초월잔여포인트); 초월잔여포인트Ref.current = 초월잔여포인트
+  const 초월경험치Ref = useRef(초월경험치); 초월경험치Ref.current = 초월경험치
   const 각성의보석Ref = useRef(각성의보석); 각성의보석Ref.current = 각성의보석
   const ExPointRef = useRef(ExPoint); ExPointRef.current = ExPoint
   const 은하조각Ref = useRef(은하조각); 은하조각Ref.current = 은하조각
@@ -1291,6 +1310,7 @@ export default function App() {
           if (d.고유유닛 && typeof d.고유유닛 === 'object') set고유유닛(prev => ({ ...prev, ...d.고유유닛 }))
           if (typeof d.초월레벨 === 'number') set초월레벨(d.초월레벨)
           if (typeof d.초월잔여포인트 === 'number') set초월잔여포인트(d.초월잔여포인트)
+          if (typeof d.초월경험치 === 'number') set초월경험치(d.초월경험치)
           if (typeof d.각성의보석 === 'number') set각성의보석(d.각성의보석)
           if (typeof d.ExPoint === 'number') setExPoint(d.ExPoint)
           if (typeof d.은하조각 === 'number') set은하조각(d.은하조각)
@@ -1333,7 +1353,7 @@ export default function App() {
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈, 명칭크리스탈Lv, 장착크리스탈,
-      크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
+      크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트, 초월경험치,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 환생패시브,
@@ -1348,7 +1368,7 @@ export default function App() {
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈, 명칭크리스탈Lv, 장착크리스탈,
-      크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
+      크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트, 초월경험치,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 환생패시브,
@@ -1400,9 +1420,11 @@ export default function App() {
       const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03) * 보스공격력보너스  // 유닛공업은 공격력() 내부에서 처리
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
+      // 허수광산 크레딧 배수 (사냥터3): 풍요/풍성=최대채광 +1배/개, 부유=최종 +20%/개, 세공=섬세도 +10%/개
+      const 광산크레딧배수 = (1 + bj.풍요 + bj.풍성) * (1 + bj.부유 * 0.2) * (1 + bj.세공 * 0.1)
       const 속도 = Math.min(700, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
       const 보스존캡 = 8
-      const 사냥터캡 = 12 + Math.min(보스처치수Ref.current, 10) * 4
+      const 사냥터캡 = Math.min(48, 8 + Math.min(보스처치수Ref.current, 10) * 4)  // 사냥터 1+2+3 합산 최대 48
       const 평균크리 = Math.min(0.95, 보주크리)
       const 초월s = 초월스텟Ref.current
       const 효과DPS = (lv: number) => 공격력(lv, 초월s, 스텟.유닛공업) * 공격력배수 * 공격속도(lv) * 공속배수 * 연타수(lv) * (1 + 평균크리)
@@ -1583,6 +1605,15 @@ export default function App() {
                 set누적강화성공(p => p + 1)
                 set최고마린lv(p => Math.max(p, 51))
                 메시지표시('✨ 초월 성공! 51강 달성!')
+              } else {
+                // 50강 초월 실패 → 마린 파괴
+                const r = 강화실패결과(50, 스텟.특수파괴방지 + 스텟.특수파괴방지2 + 명칭보너스.파괴방지 + 보석b.파괴방지 + 고유유닛스텟cur.파괴방지)
+                if (r.파괴) {
+                  if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 1000) {
+                    메시지표시('💥 50강 초월 실패... 마린 파괴!')
+                  }
+                  return { ...새m, id: -1 }
+                }
               }
               return 새m
             }
@@ -1772,10 +1803,10 @@ export default function App() {
               // 단가 조정: Lv1=1, Lv2=1만, Lv3=10억 (밸런스 — 10배 감소)
               const 단가_base = tier === 1 ? 1 : tier === 2 ? 10000 : 1000000000
               const 단가 = tier === 3 ? 단가_base * Lv3단수배율 : 단가_base
-              추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여
-              // 사냥터 3 (광산) → 크레딧 + 돈 동시 획득
+              추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * 소득배수(n.lv)
+              // 사냥터 3 (허수광산) → 크레딧 + 돈 동시 (풍요/풍성/부유/세공 보주 배수)
               if (tier === 3) {
-                추가크레딧 += Math.max(1, Math.floor(dmg / 1000))
+                추가크레딧 += Math.max(1, Math.floor(dmg / 1000 * 광산크레딧배수))
               }
               // 타격수: 41강+ 데미지 그대로, 미만은 +1
               추가공격수 += n.lv >= 51 ? Math.round(dmg) : 1
@@ -1863,18 +1894,19 @@ export default function App() {
       const finalMarines = newMarines.filter(m => m.id !== -1 && !융합소모IDs.has(m.id))
       set마린들(finalMarines)
 
-      // 자동 구입 (총 마린 200 미만). 배수만큼 한 tick에 일괄 구입
+      // 자동 구입 (총 마린 1000 미만). 배수만큼 한 tick에 일괄 구입
       const 총마린수예상 = currentMarines.length - 판매수집.length
-      if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 200) {
+      if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 1000) {
         const lv = 자동구입강도Ref.current
         const cost = 생산비용(lv)
         const 배수 = 자동구입배수Ref.current
         const 가용 = 잔여Mineral + 추가미네랄
-        const 슬롯여유 = 200 - 총마린수예상
-        const 구입가능 = Math.min(배수, 슬롯여유, Math.floor(가용 / cost))
+        const 슬롯여유 = 1000 - 총마린수예상
+        // 구입 수량 = 배수, 사용 금액 = cost × 배수² (배수 2배=4배, 3배=9배 …)
+        const 구입가능 = Math.min(배수, 슬롯여유, Math.floor(Math.sqrt(가용 / cost)))
         if (구입가능 > 0) {
           자동구입타이머Ref.current = now
-          잔여Mineral -= cost * 구입가능
+          잔여Mineral -= cost * 구입가능 * 구입가능
           set마린들(prev => {
             let bc = prev.filter(m => m.location === 'base').length
             const 추가: 마린[] = []
@@ -2094,16 +2126,34 @@ export default function App() {
     let xp = 경험치Ref.current + Math.round(amount * 경험배수)
     let simLv = 캐릭레벨Ref.current
     let lvDelta = 0
-    while (xp >= 다음경험치(simLv + lvDelta)) {
+    while (simLv + lvDelta < 캐릭레벨최대 && xp >= 다음경험치(simLv + lvDelta)) {
       xp -= 다음경험치(simLv + lvDelta)
       lvDelta++
     }
-    set경험치(xp)
     if (lvDelta > 0) {
       set캐릭레벨(prev => prev + lvDelta)
       set잔여포인트(prev => prev + lvDelta)
       메시지표시(`🎊 레벨업! +${lvDelta} (+${lvDelta} 포인트)`)
     }
+    // 30만 레벨 도달 시 잔여 xp → 초월경험치 (초월 경험 보주 배수 적용)
+    if (simLv + lvDelta >= 캐릭레벨최대 && xp > 0) {
+      const 초월경험보주 = 1 + 보주합산(보주Ref.current, '초월경험')
+      let txp = 초월경험치Ref.current + Math.round(xp * 초월경험보주)
+      let tlv = 초월레벨Ref.current
+      let tDelta = 0
+      while (tlv >= 1 && txp >= 다음초월경험치(tlv + tDelta)) {
+        txp -= 다음초월경험치(tlv + tDelta)
+        tDelta++
+      }
+      set초월경험치(txp)
+      if (tDelta > 0) {
+        set초월레벨(prev => prev + tDelta)
+        set초월잔여포인트(prev => prev + tDelta)
+        메시지표시(`🌀 초월레벨업! +${tDelta} (+${tDelta} 초월포인트)`)
+      }
+      xp = 0
+    }
+    set경험치(xp)
   }
 
   // 스탯 포인트 분배 (일반 스텟) — max/cost 메타 기반
@@ -2183,6 +2233,7 @@ export default function App() {
     set고유유닛({ ...초기고유유닛, 공격력: _고유시작, 추가1강: _고유시작, 특수강화: _고유시작 })
     set초월레벨(0)
     set초월잔여포인트(0)
+    set초월경험치(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1)
     set몹들(초기몹들())
     // 패시브: 자동강화 시작 해금
@@ -2400,8 +2451,8 @@ export default function App() {
   function 유닛구매(강도: number, 수량: number = 1) {
     const 단가 = 생산비용(강도)
     const 총마린수 = 마린들Ref.current.length
-    if (총마린수 >= 200) { 메시지표시('🚫 마린 가득참 (총 200 최대)'); return }
-    const 여유 = 200 - 총마린수
+    if (총마린수 >= 1000) { 메시지표시('🚫 마린 가득참 (총 1000 최대)'); return }
+    const 여유 = 1000 - 총마린수
     const 가능자원 = Math.floor(mineralRef.current / 단가)
     const 실수량 = Math.min(수량, 여유, 가능자원)
     if (실수량 < 1) {
@@ -2642,6 +2693,7 @@ export default function App() {
     set고유유닛({ ...초기고유유닛 })
     set초월레벨(0)
     set초월잔여포인트(0)
+    set초월경험치(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1)
     set환생레벨(0); set누적환생수(0); set환생패시브({})
     set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
@@ -2710,6 +2762,7 @@ export default function App() {
               {은하조각 > 0 && <Text style={[styles.statSmall, { color: '#4ec9ff' }]}>🌌 은하: {숫자포맷(은하조각)}</Text>}
               {자각보주 > 0 && <Text style={[styles.statSmall, { color: '#f5a623' }]}>🔯 자각: {숫자포맷(자각보주)}</Text>}
               {초월레벨 > 0 && <Text style={[styles.statSmall, { color: '#a855f7' }]}>🌀 초월Lv.{초월레벨}</Text>}
+              {초월레벨 > 0 && <Text style={[styles.statSmall, { color: '#c89bff' }]}>🌀 초월XP: {숫자포맷(초월경험치)}/{숫자포맷(다음초월경험치(초월레벨))}</Text>}
               {환생레벨 > 0 && <Text style={[styles.statSmall, { color: '#ff6ad9' }]}>🌟 환생Lv.{환생레벨}</Text>}
             </View>
             {/* ExPoint → 크레딧 교환 */}
@@ -2739,7 +2792,7 @@ export default function App() {
           style={[styles.tab, 현재화면 === 'base' && styles.tabActive]}
           onPress={() => { set현재화면('base'); set선택ID([]) }}
         >
-          <Text style={styles.tabText}>🏠 ({베이스마린들.length}) [{마린들.length}/200]</Text>
+          <Text style={styles.tabText}>🏠 ({베이스마린들.length}) [{마린들.length}/1000]</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, 현재화면 === 'hunting1' && styles.tabActive]}
@@ -2767,14 +2820,8 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* 작은 버튼 바 (생산/자동/보주/크리스탈) */}
+      {/* 작은 버튼 바 (자동/보주/크리스탈) */}
       <View style={styles.smallBtnBar}>
-        <TouchableOpacity style={styles.smallBtn} onPress={() => {
-          const v = !생산패널열림
-          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
-        }}>
-          <Text style={styles.smallBtnText}>🏭 생산</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !자동패널열림
           set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
@@ -3001,7 +3048,8 @@ export default function App() {
         )}
 
         {/* 마린 (현재 화면에 있는 마린만) */}
-        {!내부계산모드 && 화면마린들.map(m => {
+        {/* 내부계산모드: 강화중(자동강화 대상 lv 이하) 유닛 숨김, 강화 끝난 유닛만 표시 */}
+        {(내부계산모드 ? 화면마린들.filter(m => !(자동강화ON && m.lv <= 자동강화최대lv)) : 화면마린들).map(m => {
           const selected = 선택ID.includes(m.id)
           const flash = m.공격플래시Until > now
           return (
@@ -3626,35 +3674,6 @@ export default function App() {
         </View>
       )}
 
-      {/* 유닛 생산 패널 */}
-      {생산패널열림 && (
-        <View style={styles.prodPanel}>
-          <View style={styles.prodHeader}>
-            <Text style={styles.prodTitle}>🏭 유닛 생산소</Text>
-            <TouchableOpacity onPress={() => set생산패널열림(false)}>
-              <Text style={styles.closeBtn}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.prodSubtitle}>강도 선택 → 구매</Text>
-          <View style={styles.prodGrid}>
-            {생산강도목록.map(강도 => {
-              const 단가 = 생산비용(강도)
-              const 가능 = mineral >= 단가
-              return (
-                <TouchableOpacity
-                  key={강도}
-                  style={[styles.prodBtn, !가능 && styles.prodBtnDisabled]}
-                  onPress={() => 유닛구매(강도, 1)}
-                >
-                  <Text style={styles.prodBtnLv}>+{강도}</Text>
-                  <Text style={styles.prodBtnCost}>{숫자포맷(단가)}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-        </View>
-      )}
-
       {/* 키보드 안내 (PC) */}
       {Platform.OS === 'web' && (
         <View style={styles.controls}>
@@ -3735,6 +3754,8 @@ const styles = StyleSheet.create({
     width: 필드_W,
     marginBottom: 2,
     gap: 3,
+    zIndex: 300,  // 패널보다 위 → 패널 열린 상태로도 클릭 가능
+    elevation: 30,
   },
   tab: {
     flex: 1,
@@ -3902,6 +3923,8 @@ const styles = StyleSheet.create({
     width: 필드_W,
     marginBottom: 2,
     gap: 3,
+    zIndex: 300,  // 패널보다 위 → 패널 열린 상태로도 클릭 가능
+    elevation: 30,
   },
   smallBtn: {
     flex: 1,
@@ -3975,7 +3998,7 @@ const styles = StyleSheet.create({
   backButtonText: { color: '#7ed957', fontSize: 14, fontWeight: 'bold' },
   prodPanel: {
     position: 'absolute',
-    top: 150,  // stat/tab/smallBtn 아래
+    top: 205,  // 탭/버튼바 아래로 내려서 버튼 클릭 가능
     left: 8,
     right: 8,
     backgroundColor: '#16213e',
@@ -3984,7 +4007,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#7ed957',
     zIndex: 100,
-    maxHeight: 화면H - 250,
+    maxHeight: 화면H - 310,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
