@@ -2974,7 +2974,7 @@ export default function App() {
                 borderWidth: 0,
               }]} pointerEvents="none">
                 <Image source={img} style={{ width: z.w, height: z.h - 14, resizeMode: 'contain' }} />
-                <Text style={[styles.zoneLabel, { color: z.color, textShadowColor: '#000', textShadowRadius: 3 }]}>{z.label}</Text>
+                <Text style={[styles.zoneLabel, { color: z.color, textShadowColor: '#000', textShadowRadius: 3, width: z.w, textAlign: 'center' }]}>{z.label}</Text>
               </View>
             ))}
           </>
