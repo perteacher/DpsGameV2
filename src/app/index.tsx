@@ -2373,6 +2373,17 @@ export default function App() {
     }
   }
 
+  // ExP → 크레딧 변환 (보유량 비율로 한번에 환전)
+  const EXP_크레딧환율 = 100000
+  function ExP를크레딧으로(비율: number) {
+    const 변환ExP = Math.floor(ExPointRef.current * 비율)
+    if (변환ExP < 1) { 메시지표시('⭐ 변환할 ExP가 부족합니다'); return }
+    const 획득크레딧 = 변환ExP * EXP_크레딧환율
+    setExPoint(p => p - 변환ExP)
+    set크레딧(p => p + 획득크레딧)
+    메시지표시(`⭐${숫자포맷(변환ExP)} → 💰${숫자포맷(획득크레딧)} 크레딧`)
+  }
+
   // 고유유닛 강화 (크레딧 사용)
   const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치'>, (lv: number) => number> = {
     공격력:   lv => (lv + 1) * 100,
@@ -2805,22 +2816,21 @@ export default function App() {
             {초월레벨 > 0 && <Text style={[styles.currencyItem, { color: '#c89bff' }]}>🌀 초월Lv.{초월레벨} ({숫자포맷(초월경험치)}/{숫자포맷(다음초월경험치(초월레벨))})</Text>}
             {환생레벨 > 0 && <Text style={[styles.currencyItem, { color: '#ff6ad9' }]}>🌟 환생Lv.{환생레벨}</Text>}
           </View>
-          <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1:100,000)</Text>
+          <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1 : {숫자포맷(EXP_크레딧환율)})</Text>
           <View style={styles.currencyBtnRow}>
-            {[1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000].map(n => (
-              <TouchableOpacity
-                key={n}
-                style={[styles.upgBtn, ExPoint < n && styles.upgBtnOff, { minWidth: 108, paddingHorizontal: 6 }]}
-                onPress={() => {
-                  if (ExPointRef.current < n) { 메시지표시(`⭐ ExPoint ${n} 필요`); return }
-                  setExPoint(p => p - n)
-                  set크레딧(p => p + n * 100000)
-                  메시지표시(`⭐${n} → 💰${숫자포맷(n * 100000)} 크레딧`)
-                }}
-              >
-                <Text style={[styles.upgBtnText, { fontSize: 10 }]}>⭐{n} → 💰{숫자포맷(n * 100000)}</Text>
-              </TouchableOpacity>
-            ))}
+            {([['25%', 0.25], ['50%', 0.5], ['전부', 1]] as const).map(([라벨, 비율]) => {
+              const 변환ExP = Math.floor(ExPoint * 비율)
+              return (
+                <TouchableOpacity
+                  key={라벨}
+                  style={[styles.upgBtn, 변환ExP < 1 && styles.upgBtnOff, { minWidth: 100, paddingHorizontal: 6 }]}
+                  onPress={() => ExP를크레딧으로(비율)}
+                >
+                  <Text style={[styles.upgBtnText, { fontSize: 12 }]}>{라벨}</Text>
+                  <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(변환ExP)} → 💰{숫자포맷(변환ExP * EXP_크레딧환율)}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
           </ScrollView>
         </View>
