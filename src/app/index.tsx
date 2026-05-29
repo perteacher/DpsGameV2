@@ -944,7 +944,8 @@ function 보스HP(보스번호: number): number {
 }
 
 function 보스DPS게이트(보스번호: number): number {
-  return Math.round(보스HP(보스번호) / 60)
+  // requiredDps 5배 상승: HP/60 * 5 = HP/12
+  return Math.round(보스HP(보스번호) / 12)
 }
 
 
@@ -1109,7 +1110,7 @@ export default function App() {
   const [초월잔여포인트, set초월잔여포인트] = useState(0)
   const [초월경험치, set초월경험치] = useState(0)  // 30만 레벨 도달 후 누적 → 초월레벨업
   // 환생 시스템 (영구 — 환생시 유지)
-  // 트리거: 60강 마린 보유 + 초월레벨 ≥ 10
+  // 트리거: 50강 마린 보유 + 초월레벨 ≥ 10
   // 보상: 환생크레딧 (일반 크레딧과 합산) + 환생레벨 +1
   // 환생크레딧 = floor((초월레벨 × 1000) + (총공격수 / 1e8))
   const [환생레벨, set환생레벨] = useState(0)
@@ -2214,12 +2215,12 @@ export default function App() {
   // ============================================
   // 🌟 환생 시스템
   // ============================================
-  // 트리거 조건: 60강 마린 보유 + 초월레벨 ≥ 10
+  // 트리거 조건: 50강 마린 보유 + 초월레벨 ≥ 10
   // 환생크레딧 = floor((초월레벨 × 1000) + (총공격수 / 1e8))
   // 환생레벨 +1, 환생패시브/환생레벨/누적환생수/크레딧 외 모두 리셋
   function 환생가능여부(): { ok: boolean; 이유: string } {
-    const has60 = 마린들Ref.current.some(m => m.lv >= 60)
-    if (!has60) return { ok: false, 이유: '60강 마린 필요' }
+    const has50 = 마린들Ref.current.some(m => m.lv >= 50)
+    if (!has50) return { ok: false, 이유: '50강 마린 필요' }
     if (초월레벨Ref.current < 10) return { ok: false, 이유: '초월레벨 10 필요' }
     return { ok: true, 이유: '' }
   }
@@ -3571,7 +3572,7 @@ export default function App() {
             </View>
             <Text style={styles.prodSubtitle}>누적 환생: {누적환생수}회 · 💰 {숫자포맷(크레딧)}</Text>
             <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
-              조건: 60강 마린 보유 + 초월레벨 ≥ 10
+              조건: 50강 마린 보유 + 초월레벨 ≥ 10
             </Text>
             <Text style={[styles.prodSubtitle, { color: '#f5a623', fontSize: 11 }]}>
               💡 환생 보상은 💰크레딧으로 지급 → 🦸고유유닛 강화에 사용
