@@ -2770,7 +2770,11 @@ export default function App() {
             <Text style={styles.statSmall}>🎯 {숫자포맷(총공격수)}</Text>
           </TouchableOpacity>
           <Text style={[styles.statSmall, { color: 잔여포인트 > 0 ? '#f5a623' : '#aaa' }]}>Lv.{캐릭레벨}{잔여포인트 > 0 ? ` (+${잔여포인트}P)` : ''}</Text>
-          <TouchableOpacity onPress={() => set재화패널열림(v => !v)} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#3a5a8a', borderRadius: 4 }}>
+          <TouchableOpacity onPress={() => set재화패널열림(v => {
+            const next = !v
+            if (next) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+            return next
+          })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#3a5a8a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>💰 재화</Text>
           </TouchableOpacity>
         </View>
@@ -2784,6 +2788,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
+          <ScrollView style={{ maxHeight: 화면H - 420 }}>
           <View style={styles.currencyGrid}>
             <Text style={[styles.currencyItem, { color: '#f5a623' }]}>📊 일반P {숫자포맷(잔여포인트)}</Text>
             <Text style={[styles.currencyItem, { color: '#a855f7' }]}>🌀 초월P {숫자포맷(초월잔여포인트)}</Text>
@@ -2816,6 +2821,7 @@ export default function App() {
               </TouchableOpacity>
             ))}
           </View>
+          </ScrollView>
         </View>
       )}
 
@@ -2857,31 +2863,31 @@ export default function App() {
       <View style={styles.smallBtnBar}>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !자동패널열림
-          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set자동패널열림(v); if (v) { set재화패널열림(false); set생산패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🤖 자동</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !강화패널열림
-          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+          set강화패널열림(v); if (v) { set재화패널열림(false); set생산패널열림(false); set자동패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>✨ 강화</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !명칭크리스탈패널열림
-          set명칭크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set강화패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+          set명칭크리스탈패널열림(v); if (v) { set재화패널열림(false); set생산패널열림(false); set자동패널열림(false); set강화패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🌟 크리스탈</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !고유유닛패널열림
-          set고유유닛패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
+          set고유유닛패널열림(v); if (v) { set재화패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🦸 고유</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.smallBtn, { backgroundColor: '#5b2a8c' }]} onPress={() => {
           const v = !환생패널열림
-          set환생패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set환생패널열림(v); if (v) { set재화패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🌟 환생{환생레벨 > 0 ? `(Lv.${환생레벨})` : ''}</Text>
         </TouchableOpacity>
@@ -4037,7 +4043,7 @@ const styles = StyleSheet.create({
   backButtonText: { color: '#7ed957', fontSize: 14, fontWeight: 'bold' },
   currencyPanel: {
     position: 'absolute',
-    top: 56,
+    top: 260,
     left: 8,
     right: 8,
     backgroundColor: '#16213e',
@@ -4046,6 +4052,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#3a5a8a',
     zIndex: 250,
+    maxHeight: 화면H - 360,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
