@@ -343,9 +343,9 @@ function 다음경험치(lv: number): number {
   // 10 * lv → lv 1: 10, lv 1000: 1만, lv 30만: 300만 (linear, 매우 부드러움)
   return Math.max(10, Math.round(10 * lv))
 }
-// 초월경험치 → 초월레벨업 필요량 (30만 레벨 도달 후). 초월lv 1당 1e4 증가
+// 초월경험치 → 초월레벨업 필요량 (30만 레벨 도달 후). 초월lv 1당 100 증가
 function 다음초월경험치(초월lv: number): number {
-  return 10000 * Math.max(1, 초월lv)
+  return 100 * Math.max(1, 초월lv)
 }
 // 51강 강화 1회 시도당 초월경험치
 const 강화51초월경험 = 1
