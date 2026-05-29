@@ -1117,14 +1117,13 @@ export default function App() {
   const [초월레벨, set초월레벨] = useState(0)
   const [초월잔여포인트, set초월잔여포인트] = useState(0)
   const [초월경험치, set초월경험치] = useState(0)  // 30만 레벨 도달 후 누적 → 초월레벨업
-  // 환생 시스템 (영구 — 환생시 유지)
-  // 트리거: 50강 마린 보유 + 초월레벨 ≥ 10
-  // 보상: 환생크레딧 (일반 크레딧과 합산) + 환생레벨 +1
-  // 환생크레딧 = floor((초월레벨 × 1000) + (총공격수 / 1e8))
+  // 환생 시스템
+  // 트리거: 50강 마린 1마리 이상 보유
+  // 보상: ExPoint = (이번 환생까지 누적 생산한 50강+ 유닛 수) × EXP_마리당
   const [환생레벨, set환생레벨] = useState(0)
   const [누적환생수, set누적환생수] = useState(0)
-  // 패시브: id → 구입 레벨
-  const [환생패시브, set환생패시브] = useState<Record<string, number>>({})
+  // 이번 환생 동안 50강 이상에 도달한 유닛 누적 수 (환생시 리셋) — 환생 ExP 보상 산정
+  const [누적50강생산, set누적50강생산] = useState(0)
   const [환생패널열림, set환생패널열림] = useState(false)
   const [재화패널열림, set재화패널열림] = useState(false)
   const [자동구입배수, set자동구입배수] = useState<number>(1)
@@ -1174,6 +1173,7 @@ export default function App() {
   const 몹들Ref = useRef(몹들); 몹들Ref.current = 몹들
   const mineralRef = useRef(mineral); mineralRef.current = mineral
   const 총공격수Ref = useRef(총공격수); 총공격수Ref.current = 총공격수
+  const 누적50강생산Ref = useRef(누적50강생산); 누적50강생산Ref.current = 누적50강생산
   const 보스처치수Ref = useRef(보스처치수); 보스처치수Ref.current = 보스처치수
   const 보스킬쿨다운Ref = useRef(0)
   const 최고DPSRef = useRef(최고DPS); 최고DPSRef.current = 최고DPS
@@ -1344,7 +1344,7 @@ export default function App() {
           if (typeof d.extraXI받음 === 'number') setExtraXI받음(d.extraXI받음)
           if (typeof d.환생레벨 === 'number') set환생레벨(d.환생레벨)
           if (typeof d.누적환생수 === 'number') set누적환생수(d.누적환생수)
-          if (d.환생패시브 && typeof d.환생패시브 === 'object') set환생패시브(d.환생패시브)
+          if (typeof d.누적50강생산 === 'number') set누적50강생산(d.누적50강생산)
           // 오프라인 보상
           if (typeof d.마지막저장시간 === 'number' && d.마지막저장시간 > 0) {
             const 경과초 = Math.min(8 * 3600, (Date.now() - d.마지막저장시간) / 1000)
@@ -1380,7 +1380,7 @@ export default function App() {
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트, 초월경험치,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
-      환생레벨, 누적환생수, 환생패시브,
+      환생레벨, 누적환생수, 누적50강생산,
       누적강화성공, 누적판매, 최고마린lv, 융합누적,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수,
       강화최초달성: Array.from(강화최초달성),
@@ -1395,7 +1395,7 @@ export default function App() {
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트, 초월경험치,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
-      환생레벨, 누적환생수, 환생패시브,
+      환생레벨, 누적환생수, 누적50강생산,
       누적강화성공, 누적판매, 최고마린lv, 융합누적,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수, 로드완료])
 
@@ -1622,11 +1622,10 @@ export default function App() {
             const 초월51_53보너스 = 0  // 신규 초월스텟에서는 강화시도() 내부에서 단계별 처리
             // 초월 56강 융합확률 보너스 (56강 적용)
             const 초월56융합 = 0  // 신규 초월스텟에서 강화시도() 내부 처리
-            const _환생강화보너스 = Math.min(0.05, (환생패시브['강화확률'] ?? 0) * 0.005)
-            const 외부강화보너스 = 보주강화 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005 + 초월51_53보너스 + 초월56융합 + _환생강화보너스 + 보석b.궁극보너스
+            const 외부강화보너스 = 보주강화 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005 + 초월51_53보너스 + 초월56융합 + 보석b.궁극보너스
             // 50강 → 51강 초월 시도 (base 0.5% + 누적). 51강 도달은 초월시스템과 무관 (30만렙만 unlock)
             if (m.lv === 50) {
-              const 추가 = (초월스텟Ref.current.추가초월확률 + 명칭보너스.초월확률 + 초월lv + (환생패시브['초월보너스'] ?? 0)) * 0.00001 + 보석b.초월확률추가
+              const 추가 = (초월스텟Ref.current.추가초월확률 + 명칭보너스.초월확률 + 초월lv) * 0.00001 + 보석b.초월확률추가
               const 초월p = 0.005 + 추가  // base 0.5%
               if (Math.random() < Math.min(0.95, 초월p)) {
                 새m.lv = 51
@@ -1665,6 +1664,8 @@ export default function App() {
               새m.lv = m.lv + 증가
               set누적강화성공(p => p + 1)
               set최고마린lv(p => Math.max(p, 새m.lv))
+              // 50강 첫 도달 시 누적 카운트 (환생 ExP 보상 산정용)
+              if (m.lv < 50 && 새m.lv >= 50) set누적50강생산(p => p + 1)
               // 강화 최초 달성 보상 (45~50강, 사진 기반)
               const 최초보상표: Record<number, { 크레딧: number; 무색: number }> = {
                 45: { 크레딧: 5e6, 무색: 32 },
@@ -2075,7 +2076,7 @@ export default function App() {
         set캐릭레벨(prev => prev + 500)
         set잔여포인트(prev => prev + 500)
         if (Platform.OS !== 'web') Vibration.vibrate([0, 100, 50, 100])
-        const _보스배수 = 1 + (환생패시브['보스보상'] ?? 0) * 0.5
+        const _보스배수 = 1
         const 조각드랍 = Math.round((baseN + 1) * 10 * (1 + 보주합산(bj, '조각')) * _보스배수)
         set크리스탈조각(prev => prev + 조각드랍)
         XP획득(Math.round((baseN + 1) * 200 * _보스배수))
@@ -2222,29 +2223,29 @@ export default function App() {
   // ============================================
   // 🌟 환생 시스템
   // ============================================
-  // 트리거 조건: 50강 마린 보유 + 초월레벨 ≥ 10
-  // 환생크레딧 = floor((초월레벨 × 1000) + (총공격수 / 1e8))
-  // 환생레벨 +1, 환생패시브/환생레벨/누적환생수/크레딧 외 모두 리셋
+  // 트리거 조건: 50강 마린 1마리 이상 보유
+  // 보상 ExPoint = (이번 환생까지 누적 생산한 50강+ 유닛 수) × EXP_마리당50강
+  // 환생레벨/누적환생수/크레딧/ExPoint 외 모두 리셋, 누적50강생산은 0으로 초기화
+  const EXP_마리당50강 = 100  // 밸런스 계수: 50강 판매비용(1e8크레딧=ExP1000) 대비 ~10%. 너무 약하면 올리기
   function 환생가능여부(): { ok: boolean; 이유: string } {
     const has50 = 마린들Ref.current.some(m => m.lv >= 50)
     if (!has50) return { ok: false, 이유: '50강 마린 필요' }
-    if (초월레벨Ref.current < 10) return { ok: false, 이유: '초월레벨 10 필요' }
     return { ok: true, 이유: '' }
   }
   function 환생보상ExPoint(): number {
-    return Math.floor(초월레벨Ref.current * 1000 + 총공격수Ref.current / 1e8)
+    return 누적50강생산Ref.current * EXP_마리당50강
   }
   function 환생실행() {
     const chk = 환생가능여부()
     if (!chk.ok) { 메시지표시(`⛔ 환생 불가: ${chk.이유}`); return }
     const 보상 = 환생보상ExPoint()
     if (typeof window !== 'undefined' && window.confirm) {
-      if (!window.confirm(`정말 환생할까요?\n\n보상: ⭐ ${숫자포맷(보상)} ExPoint + 환생레벨 +1\n\n[유지] 환생레벨, 환생패시브, ExPoint\n[리셋] 마린/재화/스텟/보주/크리스탈/보석/고유유닛/초월/크레딧`)) return
+      if (!window.confirm(`정말 환생할까요?\n\n50강+ 누적 생산 ${숫자포맷(누적50강생산Ref.current)}마리 → 보상 ⭐ ${숫자포맷(보상)} ExPoint\n\n[유지] 환생레벨, ExPoint\n[리셋] 마린/재화/스텟/보주/크리스탈/보석/고유유닛/초월/크레딧`)) return
     }
     const 유지_ExPoint = ExPoint + 보상
-    // 리셋 (게임초기화와 동일하지만 환생 항목 + 크레딧 보존)
+    // 리셋 (게임초기화와 동일하지만 환생 항목 + ExPoint 보존)
     set마린들(초기마린들())
-    setMineral(100 + (환생패시브['시작미네랄'] ?? 0) * 1000)
+    setMineral(100)
     set총공격수(0)
     set보스처치수(0)
     set최고DPS(0)
@@ -2255,25 +2256,21 @@ export default function App() {
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
     set초월스텟({ ...초기초월스텟 })
     set각성의보석(0); setExPoint(유지_ExPoint); set은하조각(0); set자각보주(0)
-    // 패시브: 타격수 50% 유지
-    const 타격수유지 = (환생패시브['타격수유지'] ?? 0) > 0
-    if (!타격수유지) set타격수획득idx(0)
+    set타격수획득idx(0)
     setExtraVI받음(0); setExtraXI받음(0)
     set명칭크리스탈({ ...초기명칭크리스탈 })
     set명칭크리스탈Lv({})
     set장착크리스탈([])
     set크레딧(0)
     set보석({ ...초기보석 })
-    const _고유시작 = 환생패시브['고유유닛시작'] ?? 0
-    set고유유닛({ ...초기고유유닛, 공격력: _고유시작, 추가1강: _고유시작, 특수강화: _고유시작 })
+    set고유유닛({ ...초기고유유닛 })
     set초월레벨(0)
     set초월잔여포인트(0)
     set초월경험치(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1); set융합누적(0)
+    set누적50강생산(0)  // 이번 환생 보상으로 정산 완료 → 0부터 다시 누적
     set몹들(초기몹들())
-    // 패시브: 자동강화 시작 해금
-    const 자동해금 = (환생패시브['자동강화시작'] ?? 0) > 0
-    set자동강화ON(자동해금); set자동강화최대lv(1)
+    set자동강화ON(false); set자동강화최대lv(1)
     set자동판매ON(false); set자동판매lv(50)
     set자동구입강도(1); set자동구입ON(false)
     set적들(초기적들(1))
@@ -2284,34 +2281,18 @@ export default function App() {
     set환생레벨(v => v + 1)
     set누적환생수(v => v + 1)
     set환생패널열림(false)
-    메시지표시(`🌟 환생! 💰+${숫자포맷(보상)} 크레딧 (환생Lv.${환생레벨 + 1})`)
+    메시지표시(`🌟 환생! ⭐+${숫자포맷(보상)} ExPoint (환생Lv.${환생레벨 + 1})`)
   }
-  // 환생 패시브 정의
-  const 환생패시브목록 = [
-    { id: '시작미네랄',    이름: '🌱 시작 미네랄',     설명: '환생 시작시 💎+1000/lv',                   기본가: 5000,  maxLv: 50 },
-    { id: '강화확률',      이름: '🎯 강화 확률',       설명: '모든 강화확률 +0.5%p/lv (최대 5%)',         기본가: 20000, maxLv: 10 },
-    { id: '자동강화시작',  이름: '⚙️ 자동강화 해금',    설명: '환생후 자동강화 자동 활성화 (1회)',         기본가: 30000, maxLv: 1 },
-    { id: '초월보너스',    이름: '🌀 초월레벨 보너스',  설명: '초월확률 계산에 +1/lv 가산',               기본가: 50000, maxLv: 100 },
-    { id: '응무조효율',    이름: '💠 응무조 효율',      설명: '무색조각→응무조 환산시 ×(1+lv)',           기본가: 40000, maxLv: 9 },
-    { id: '보스보상',      이름: '👹 보스 보상',        설명: '보스 처치 보상 ×(1+0.5×lv)',               기본가: 60000, maxLv: 10 },
-    { id: '고유유닛시작',  이름: '🛡️ 고유유닛 시작',   설명: '환생시 고유유닛 시작 강화 +1/lv',          기본가: 80000, maxLv: 20 },
-    { id: '타격수유지',    이름: '⚡ 타격수 유지',      설명: '환생후 타격수 진행 50% 인계 (1회)',         기본가: 100000,maxLv: 1 },
-  ] as const
-  function 환생패시브가격(id: string): number {
-    const def = 환생패시브목록.find(p => p.id === id)
-    if (!def) return Infinity
-    const lv = 환생패시브[id] ?? 0
-    return Math.floor(def.기본가 * Math.pow(2, lv))
-  }
-  function 환생패시브구입(id: string) {
-    const def = 환생패시브목록.find(p => p.id === id)
-    if (!def) return
-    const lv = 환생패시브[id] ?? 0
-    if (lv >= def.maxLv) { 메시지표시('⛔ 최대 레벨'); return }
-    const cost = 환생패시브가격(id)
-    if (크레딧 < cost) { 메시지표시(`⛔ 크레딧 부족 (필요 ${숫자포맷(cost)})`); return }
-    set크레딧(c => c - cost)
-    set환생패시브(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
+
+  // 강화 초기화: 강화한 유닛만 베이스 상태로 되돌림 (재화/스텟/크레딧 등은 보존)
+  function 강화초기화() {
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (!window.confirm('강화한 유닛을 전부 초기화할까요?\n\n마린이 모두 사라지고 처음 상태로 돌아갑니다.\n(재화/스텟/크레딧/고유유닛/초월 등은 유지)')) return
+    }
+    set마린들(초기마린들())
+    set선택ID([])
+    set현재화면('base')
+    메시지표시('🧹 강화 유닛 초기화됨')
   }
 
   // 보주 구입 (응무조 사용, 수량 지정)
@@ -2746,7 +2727,7 @@ export default function App() {
     set초월잔여포인트(0)
     set초월경험치(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1); set융합누적(0)
-    set환생레벨(0); set누적환생수(0); set환생패시브({})
+    set환생레벨(0); set누적환생수(0); set누적50강생산(0)
     set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
     set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false)
     set몹들(초기몹들())
@@ -3595,15 +3576,19 @@ export default function App() {
                 <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.prodSubtitle}>누적 환생: {누적환생수}회 · 💰 {숫자포맷(크레딧)}</Text>
+            <Text style={styles.prodSubtitle}>누적 환생: {누적환생수}회</Text>
             <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
-              조건: 50강 마린 보유 + 초월레벨 ≥ 10
+              조건: 50강+ 마린 1마리 이상 보유
             </Text>
             <Text style={[styles.prodSubtitle, { color: '#f5a623', fontSize: 11 }]}>
-              💡 환생 보상은 💰크레딧으로 지급 → 🦸고유유닛 강화에 사용
+              💡 보상 ⭐ExPoint = 누적 생산한 50강+ 유닛 1마리당 {EXP_마리당50강}
+              {'\n'}→ 재화창에서 ExP를 💰크레딧으로 교환해 사용
+            </Text>
+            <Text style={[styles.prodSubtitle, { color: '#fff' }]}>
+              이번 누적 50강+ 생산: {숫자포맷(누적50강생산)}마리
             </Text>
             <Text style={[styles.prodSubtitle, { color: chk.ok ? '#7ed957' : '#ff6b6b' }]}>
-              {chk.ok ? `✓ 환생 가능 — 보상 💰 ${숫자포맷(보상)}` : `✗ ${chk.이유}`}
+              {chk.ok ? `✓ 환생 가능 — 보상 ⭐ ${숫자포맷(보상)} ExPoint` : `✗ ${chk.이유}`}
             </Text>
             <TouchableOpacity
               style={[styles.upgBtn, { backgroundColor: chk.ok ? '#7ed957' : '#555', marginVertical: 8 }]}
@@ -3611,33 +3596,13 @@ export default function App() {
               disabled={!chk.ok}
             >
               <Text style={[styles.upgBtnText, { fontSize: 14 }]}>
-                🌟 환생하기 (보상 💰 {숫자포맷(보상)})
+                🌟 환생하기 (보상 ⭐ {숫자포맷(보상)})
               </Text>
             </TouchableOpacity>
             <View style={styles.divider} />
-            <Text style={[styles.prodSubtitle, { color: '#f5a623' }]}>🎁 영구 패시브 (💰 크레딧 소모)</Text>
-            <ScrollView style={{ maxHeight: 360 }}>
-              {환생패시브목록.map(p => {
-                const lv = 환생패시브[p.id] ?? 0
-                const maxed = lv >= p.maxLv
-                const cost = maxed ? 0 : 환생패시브가격(p.id)
-                const ok = !maxed && 크레딧 >= cost
-                return (
-                  <View key={p.id} style={styles.upgRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.upgLabel}>{p.이름} <Text style={{ color: '#f5a623' }}>Lv.{lv}/{p.maxLv}</Text></Text>
-                      <Text style={styles.upgEffect}>{p.설명}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 80 }]}
-                      onPress={() => 환생패시브구입(p.id)}
-                    >
-                      <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `💰${숫자포맷(cost)}`}</Text>
-                    </TouchableOpacity>
-                  </View>
-                )
-              })}
-            </ScrollView>
+            <Text style={[styles.prodSubtitle, { color: '#aaa', fontSize: 11 }]}>
+              ※ 환생은 마린/재화/스텟/크레딧/고유유닛/초월을 리셋합니다 (환생레벨·ExPoint는 유지)
+            </Text>
           </View>
         )
       })()}
@@ -3753,9 +3718,14 @@ export default function App() {
         </View>
       )}
 
-      <TouchableOpacity style={styles.resetButton} onPress={게임초기화}>
-        <Text style={styles.resetButtonText}>🔄 초기화</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
+        <TouchableOpacity style={styles.resetButton} onPress={강화초기화}>
+          <Text style={styles.resetButtonText}>🧹 강화 초기화</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.resetButton} onPress={게임초기화}>
+          <Text style={styles.resetButtonText}>🔄 전체 초기화</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
     </SafeAreaView>
   )
