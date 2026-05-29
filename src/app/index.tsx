@@ -347,6 +347,13 @@ function 다음경험치(lv: number): number {
 function 다음초월경험치(초월lv: number): number {
   return 1000000 * Math.max(1, 초월lv)
 }
+// 51강 강화 1회 시도당 초월경험치
+const 강화51초월경험 = 1
+// 52강+ 유닛 판매 시 초월경험치 (강도별, 밸런스값 — 조정 가능)
+const 판매초월경험표: Record<number, number> = {
+  52: 20, 53: 350, 54: 10000, 55: 160000, 56: 3000000,
+  57: 50000000, 58: 1000000000, 59: 30000000000, 60: 1000000000000,
+}
 
 const 생산강도목록 = [1, 7, 11, 15, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 49, 50, 51, 52, 53, 54] as const
 const 생산비용표: Record<number, number> = {
@@ -1455,6 +1462,7 @@ export default function App() {
 
       let 추가미네랄 = 0  // 사냥터 mob 공격으로 획득
       let 추가크레딧 = 0  // 사냥터 3 (DPS측정기) 공격으로 획득
+      let 추가초월경험 = 0  // 51강 강화 시도 + 52강+ 판매
       let 추가공격수 = 0
       let 잔여Mineral = currentMineral
       const 플래시적: number[] = []
@@ -1641,6 +1649,7 @@ export default function App() {
               if (eff.타입 === '강화54_55' && (m.lv === 54 || m.lv === 55)) 단계보주 += cnt * eff.값
             }
             const 증가 = 강화가능 ? 강화시도(m.lv, 스텟, 외부강화보너스 + 단계보주, 보석b, 초월s) : 0
+            if (m.lv === 51) 추가초월경험 += 강화51초월경험  // 51강 강화 시도 1회당 초월경험치
             if (증가 > 0) {
               새m.lv = m.lv + 증가
               set누적강화성공(p => p + 1)
@@ -1887,6 +1896,7 @@ export default function App() {
         판매자각 += r.자각보주
         판매일반XP += Math.round(r.일반XP * 판매보상배수)
         판매크레딧 += Math.round(r.크레딧 * 판매보상배수)
+        if (s.lv >= 52) 추가초월경험 += 판매초월경험표[s.lv] ?? 0  // 52강+ 판매 → 초월경험치
         for (const 등급 of r.박스) 판매크리스탈드랍.push(박스개봉(등급))
       }
       if (총소모크레딧 > 0) set크레딧(prev => prev - 총소모크레딧)
@@ -1967,6 +1977,7 @@ export default function App() {
 
       // ExPoint 자동 초월 승급 제거 (사용자 요청). ExP는 별도 재화로만 누적
       if (판매ExP > 0) setExPoint(prev => prev + 판매ExP)
+      if (추가초월경험 > 0) 초월경험획득(추가초월경험)
 
       if (추가공격수 > 0) {
         const 새공격수 = 총공격수Ref.current + 추가공격수
@@ -2139,25 +2150,28 @@ export default function App() {
       set잔여포인트(prev => prev + lvDelta)
       메시지표시(`🎊 레벨업! +${lvDelta} (+${lvDelta} 포인트)`)
     }
-    // 30만 레벨 도달 시 잔여 xp → 초월경험치 (초월 경험 보주 배수 적용)
-    if (simLv + lvDelta >= 캐릭레벨최대 && xp > 0) {
-      const 초월경험보주 = 1 + 보주합산(보주Ref.current, '초월경험')
-      let txp = 초월경험치Ref.current + Math.round(xp * 초월경험보주)
-      let tlv = 초월레벨Ref.current
-      let tDelta = 0
-      while (tlv >= 1 && txp >= 다음초월경험치(tlv + tDelta)) {
-        txp -= 다음초월경험치(tlv + tDelta)
-        tDelta++
-      }
-      set초월경험치(txp)
-      if (tDelta > 0) {
-        set초월레벨(prev => prev + tDelta)
-        set초월잔여포인트(prev => prev + tDelta)
-        메시지표시(`🌀 초월레벨업! +${tDelta} (+${tDelta} 초월포인트)`)
-      }
-      xp = 0
-    }
+    // 만렙(30만) 도달 → 잔여 일반 XP 폐기. 초월경험치는 51강 강화/52강+ 판매로만 (초월경험획득)
+    if (simLv + lvDelta >= 캐릭레벨최대) xp = 0
     set경험치(xp)
+  }
+
+  // 초월경험치 획득 (30만 도달=초월레벨≥1 이후만). 경험 보주 ×(1+경험)/개 적용 → 초월레벨업
+  function 초월경험획득(amount: number) {
+    if (초월레벨Ref.current < 1 || amount <= 0) return
+    const 경험보주 = 1 + 보주합산(보주Ref.current, '초월경험')
+    let txp = 초월경험치Ref.current + Math.round(amount * 경험보주)
+    let tlv = 초월레벨Ref.current
+    let tDelta = 0
+    while (txp >= 다음초월경험치(tlv + tDelta)) {
+      txp -= 다음초월경험치(tlv + tDelta)
+      tDelta++
+    }
+    set초월경험치(txp)
+    if (tDelta > 0) {
+      set초월레벨(prev => prev + tDelta)
+      set초월잔여포인트(prev => prev + tDelta)
+      메시지표시(`🌀 초월레벨업! +${tDelta} (+${tDelta} 초월포인트)`)
+    }
   }
 
   // 스탯 포인트 분배 (일반 스텟) — max/cost 메타 기반
@@ -3126,7 +3140,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.prodSubtitle}>Lv.{캐릭레벨} · XP {경험치}/{다음경험치(캐릭레벨)} · 포인트 {잔여포인트} · 초월포인트 {초월잔여포인트}</Text>
+          <Text style={styles.prodSubtitle}>Lv.{캐릭레벨} · {캐릭레벨 >= 캐릭레벨최대 ? (초월레벨 > 0 ? `초월XP ${숫자포맷(초월경험치)}/${숫자포맷(다음초월경험치(초월레벨))}` : `MAX (초월 미해금)`) : `XP ${경험치}/${다음경험치(캐릭레벨)}`} · 포인트 {잔여포인트} · 초월포인트 {초월잔여포인트}</Text>
           {/* 스텟 탭 (4종 통합: 일반/초월/보주/보석) */}
           <View style={{ flexDirection: 'row', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
             <TouchableOpacity
