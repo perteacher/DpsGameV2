@@ -2903,7 +2903,23 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* 선택된 마린 표시 */}
+      {/* 필드 (화면별 배경 이미지 + 단색 fallback + responder) */}
+      <View style={[styles.field, {
+        backgroundColor: 현재화면 === 'base' ? '#1a2a3e'
+          : is사냥터(현재화면) ? '#1a3e2a'
+          : '#3e1a2a',
+        // @ts-ignore - 웹: 필드 위에서 터치/휠 스크롤 막기
+        ...(Platform.OS === 'web' ? { touchAction: 'none', overscrollBehavior: 'contain' } : {}),
+      }]}>
+      {/* 배경 이미지 (절대 첫 자식, 터치 무시) */}
+      <View style={{ position: 'absolute', top: 0, left: 0, width: 필드_W, height: 필드_H }} pointerEvents="none">
+        <Image
+          source={현재화면 === 'base' ? BG_LOBBY : is사냥터(현재화면) ? BG_HUNTING : BG_BOSS}
+          style={{ width: 필드_W, height: 필드_H, opacity: 0.55 }}
+          resizeMode="cover"
+        />
+      </View>
+      {/* 선택된 마린 표시 — 절대 오버레이, 필드 상단에 고정 */}
       {선택ID.length > 0 && (
         <ScrollView
           horizontal
@@ -2922,23 +2938,6 @@ export default function App() {
           ))}
         </ScrollView>
       )}
-
-      {/* 필드 (화면별 배경 이미지 + 단색 fallback + responder) */}
-      <View style={[styles.field, {
-        backgroundColor: 현재화면 === 'base' ? '#1a2a3e'
-          : is사냥터(현재화면) ? '#1a3e2a'
-          : '#3e1a2a',
-        // @ts-ignore - 웹: 필드 위에서 터치/휠 스크롤 막기
-        ...(Platform.OS === 'web' ? { touchAction: 'none', overscrollBehavior: 'contain' } : {}),
-      }]}>
-      {/* 배경 이미지 (절대 첫 자식, 터치 무시) */}
-      <View style={{ position: 'absolute', top: 0, left: 0, width: 필드_W, height: 필드_H }} pointerEvents="none">
-        <Image
-          source={현재화면 === 'base' ? BG_LOBBY : is사냥터(현재화면) ? BG_HUNTING : BG_BOSS}
-          style={{ width: 필드_W, height: 필드_H, opacity: 0.55 }}
-          resizeMode="cover"
-        />
-      </View>
       <View
         ref={fieldRef}
         style={styles.fieldInner}
@@ -3832,9 +3831,15 @@ const styles = StyleSheet.create({
   },
   tabText: { color: '#ffffff', fontSize: 13, fontWeight: '600' },
   selectedBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     width: 필드_W,
     maxHeight: 50,
-    marginBottom: 6,
+    zIndex: 50,
+    backgroundColor: 'rgba(13, 20, 33, 0.85)',
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
   selectedBarContent: {
     alignItems: 'center',
