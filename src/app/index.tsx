@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Dimensions, Image, ImageBackground, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native'
+import { Dimensions, Image, ImageBackground, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, Vibration, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
@@ -1052,6 +1052,13 @@ function 초기몹들(): 몹[] {
 // ============================================
 
 export default function App() {
+  // 화면 맞춤: 게임 컬럼을 뷰포트 너비에 비율 유지하며 fit (좌우 짤림/기기별 차이 해소)
+  // 컬럼 너비 = 필드_W + container 좌우 padding(4*2). 뷰포트보다 넓으면 축소, 좁으면 약간만 확대(최대 1.5).
+  const { width: 뷰포트W } = useWindowDimensions()
+  const 컬럼W = 필드_W + 8
+  const 화면맞춤배율 = Math.min(뷰포트W / 컬럼W, 1.5)
+  const 배율Ref = useRef(화면맞춤배율); 배율Ref.current = 화면맞춤배율
+
   const [현재화면, set현재화면] = useState<화면>('base')
   const [마린들, set마린들] = useState<마린[]>(() => 초기마린들())
   const [적들, set적들] = useState<적[]>(() => 초기적들(1))
@@ -2596,18 +2603,23 @@ export default function App() {
     return 적들Ref.current.find(e => 거리(e.pos, p) < 적_크기 / 2 + 10)
   }
 
+  // 화면맞춤 scale 적용 시 locationX/Y는 화면(scaled) 좌표 → 필드 논리좌표로 환산
+  const 터치좌표 = (e: any): Pos => ({
+    x: e.nativeEvent.locationX / 배율Ref.current,
+    y: e.nativeEvent.locationY / 배율Ref.current,
+  })
   const fieldResponderProps = {
     onStartShouldSetResponder: () => true,
     onMoveShouldSetResponder: () => true,
     onResponderTerminationRequest: () => false,
     onResponderGrant: (e: any) => {
-      const p: Pos = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY }
+      const p: Pos = 터치좌표(e)
       dragStartRef.current = p
       터치이동중Ref.current = false
     },
     onResponderMove: (e: any) => {
       if (!dragStartRef.current) return
-      const cur: Pos = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY }
+      const cur: Pos = 터치좌표(e)
       const start = dragStartRef.current
       const d = Math.hypot(start.x - cur.x, start.y - cur.y)
       if (d > 8) 터치이동중Ref.current = true
@@ -2623,7 +2635,7 @@ export default function App() {
     onResponderRelease: (e: any) => {
       if (!dragStartRef.current) return
       const start = dragStartRef.current
-      const end: Pos = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY }
+      const end: Pos = 터치좌표(e)
       const wasDragging = 터치이동중Ref.current
       dragStartRef.current = null
       터치이동중Ref.current = false
@@ -2755,7 +2767,11 @@ export default function App() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1a1a2e' }} edges={['top']}>
     <ScrollView
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[
+        styles.container,
+        // @ts-ignore 웹: zoom은 레이아웃 footprint까지 축소 → 가로 스크롤 안 생김
+        Platform.OS === 'web' ? { zoom: 화면맞춤배율 } : { transform: [{ scale: 화면맞춤배율 }] },
+      ]}
       bounces={false}
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
