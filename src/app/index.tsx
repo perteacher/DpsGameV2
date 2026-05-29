@@ -1941,9 +1941,8 @@ export default function App() {
 
       // 고유유닛 DPS 기여 (사냥터 배치 상시 적용)
       if (고유DPS > 0) {
-        const 고유티어 = 고유유닛스텟cur.위치
-        const 고유단가_base = 고유티어 === 1 ? 1 : 고유티어 === 2 ? 10000 : 1000000000
-        const 고유단가 = 고유티어 === 3 ? 고유단가_base * Lv3단수배율 : 고유단가_base
+        // 고유유닛 위치는 1|2뿐 (사3 진입 X). 단수효과는 채광력보너스로 별도 적용.
+        const 고유단가 = 고유유닛스텟cur.위치 === 1 ? 1 : 10000
         추가미네랄 += 고유DPS * 고유단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * dt
       }
       // 고유유닛 dest 보간 이동 (smooth)
@@ -2385,7 +2384,7 @@ export default function App() {
   }
 
   // 고유유닛 강화 (크레딧 사용)
-  const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치'>, (lv: number) => number> = {
+  const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치' | '단수'>, (lv: number) => number> = {
     공격력:   lv => (lv + 1) * 100,
     공속:     lv => (lv + 1) * 200,
     경험치:   lv => (lv + 1) * 150,
@@ -2393,10 +2392,10 @@ export default function App() {
     특수강화: lv => (lv + 1) * 250,
     파괴방지: lv => (lv + 1) * 50,
   }
-  const 고유유닛상한: Record<keyof Omit<고유유닛스텟, '위치'>, number> = {
+  const 고유유닛상한: Record<keyof Omit<고유유닛스텟, '위치' | '단수'>, number> = {
     공격력: 20, 공속: 6, 경험치: 5, 추가1강: 20, 특수강화: 10, 파괴방지: 200,
   }
-  function 고유유닛강화(stat: keyof Omit<고유유닛스텟, '위치'>) {
+  function 고유유닛강화(stat: keyof Omit<고유유닛스텟, '위치' | '단수'>) {
     const lv = 고유유닛Ref.current[stat] as number
     if (lv >= 고유유닛상한[stat]) { 메시지표시('MAX'); return }
     const 비용 = 고유유닛강화비용표[stat](lv)
@@ -2405,7 +2404,7 @@ export default function App() {
     set고유유닛(prev => ({ ...prev, [stat]: (prev[stat] as number) + 1 }))
   }
   // MAX까지 가능한 만큼 일괄 강화
-  function 고유유닛강화MAX(stat: keyof Omit<고유유닛스텟, '위치'>) {
+  function 고유유닛강화MAX(stat: keyof Omit<고유유닛스텟, '위치' | '단수'>) {
     let lv = 고유유닛Ref.current[stat] as number
     const 상한 = 고유유닛상한[stat]
     let 잔여 = 크레딧Ref.current
@@ -3505,7 +3504,7 @@ export default function App() {
       {/* 고유유닛 패널 */}
       {고유유닛패널열림 && (() => {
         const 고유DPS현재 = 고유유닛DPS(고유유닛)
-        const upgList: { stat: keyof Omit<고유유닛스텟, '위치'>; 이모지: string; 설명: string; 상한: number }[] = [
+        const upgList: { stat: keyof Omit<고유유닛스텟, '위치' | '단수'>; 이모지: string; 설명: string; 상한: number }[] = [
           { stat: '공격력',   이모지: '⚔️', 설명: '공격력 +500/강화 (기본500)',         상한: 20 },
           { stat: '공속',     이모지: '⚡', 설명: '공격속도 단계 (1→1.5→2→2.5→3→3.5→4)', 상한: 6 },
           { stat: '경험치',   이모지: '📗', 설명: '경험치 획득 +20%/강화',               상한: 5 },
