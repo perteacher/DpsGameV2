@@ -1053,10 +1053,11 @@ function 초기몹들(): 몹[] {
 
 export default function App() {
   // 화면 맞춤: 게임 컬럼을 뷰포트 너비에 비율 유지하며 fit (좌우 짤림/기기별 차이 해소)
-  // 컬럼 너비 = 필드_W + container 좌우 padding(4*2). 뷰포트보다 넓으면 축소, 좁으면 약간만 확대(최대 1.5).
+  // 컬럼 너비 = 필드_W + container 좌우 padding(4*2). 뷰포트보다 넓으면 축소만 함(확대 X).
+  // 확대를 막아야 측정 오차(뷰포트W가 실제보다 크게 읽히는 경우)에도 가로 오버플로가 안 생김.
   const { width: 뷰포트W } = useWindowDimensions()
   const 컬럼W = 필드_W + 8
-  const 화면맞춤배율 = Math.min(뷰포트W / 컬럼W, 1.5)
+  const 화면맞춤배율 = Math.min(뷰포트W / 컬럼W, 1)
   const 배율Ref = useRef(화면맞춤배율); 배율Ref.current = 화면맞춤배율
 
   const [현재화면, set현재화면] = useState<화면>('base')
