@@ -59,6 +59,12 @@ const 강화확률표: number[] = [
   0,                                          // 50 (초월 시스템)
 ]
 
+// 밸런스: 초반 진행 속도 조절. 낮출수록 초반 강화 느려짐 (1~25강에만 적용).
+const 초반강화확률배율 = 0.6
+function 강화기본확률(단계: number): number {
+  return (강화확률표[단계] ?? 0) * (단계 <= 25 ? 초반강화확률배율 : 1)
+}
+
 type 강화스텟 = {
   가산1강: number; 가산2강: number; 가산3강: number
   가산1강2: number; 가산2강2: number; 가산3강2: number
@@ -155,7 +161,7 @@ function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0
     const p = Math.min(0.95, 외부p1 + 초월보너스)
     return r < p ? 1 : 0
   }
-  const base = 강화확률표[단계] ?? 0
+  const base = 강화기본확률(단계)
 
   // 49강: 고정 0.5% + 외부보너스
   if (단계 === 49) {
@@ -336,6 +342,8 @@ function 자원배수(총DPS: number): number {
   if (총DPS < 50000000) return 64
   return 128
 }
+// 밸런스: 전체 자원(미네랄) 수급 배율. 낮출수록 초반 경제·구입·진행 전반이 느려짐.
+const 자원전역배율 = 0.3
 
 // 캐릭터 레벨 — 다음 레벨 필요 경험치. 30만 레벨까지.
 // 계산기(뉴비용.xlsx DB1!A열=레벨별 누적 필요경험치)와 완전 일치: lv→lv+1 = 3*lv*(lv-1)+10
@@ -1343,18 +1351,18 @@ export default function App() {
     else if (lv === 49) { 타입 = '고정 확률'; 확률 = [`성공 ${pct(0.005 + 외부)}  (기본 0.5%)`] }
     else if (lv === 48) { 타입 = '개별 확률'; 확률 = [`성공 ${pct(s.가산48강 * 0.0005 + 외부)}  (기본 0%)`] }
     else if (lv >= 44) {
-      const base = 강화확률표[lv] ?? 0
+      const base = 강화기본확률(lv)
       const g = [s.가산44강, s.가산45강, s.가산46강, s.가산47강][lv - 44] * 0.001
       타입 = '개별 확률'; 확률 = [`성공 ${pct(base + g + 외부)}  (기본 ${(base * 100).toFixed(1)}%)`]
     }
     else if (lv >= 40) { 타입 = '특수 확률'; 확률 = [`성공 ${pct(특수가산 + 외부)}  (특수강화 스텟 기반)`] }
     else if (lv >= 38) {
-      const base = 강화확률표[lv] ?? 0
+      const base = 강화기본확률(lv)
       const g = (s.가산1강 + s.가산1강2 + s.가산2강 + s.가산2강2 + s.가산3강 + s.가산3강2) * 0.001
       타입 = '일반 확률 (+1)'; 확률 = [`+1 ${pct(base * 1.11 + g + 특수가산 + 외부 + 일반보)}`]
     }
     else {
-      const base = 강화확률표[lv] ?? 0
+      const base = 강화기본확률(lv)
       const p3 = base / 100 + (s.가산3강 + s.가산3강2) * 0.001 + 특수가산
       const p2 = base / 10 + (s.가산2강 + s.가산2강2) * 0.001 + 특수가산
       const p1 = base + (s.가산1강 + s.가산1강2) * 0.001 + 특수가산 + 외부 + 일반보
@@ -1969,7 +1977,7 @@ export default function App() {
               // 단가 조정: Lv1=1, Lv2=1만, Lv3=10억 (밸런스 — 10배 감소)
               const 단가_base = tier === 1 ? 1 : tier === 2 ? 10000 : 1000000000
               const 단가 = tier === 3 ? 단가_base * Lv3단수배율 : 단가_base
-              추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * 소득배수(n.lv)
+              추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * 소득배수(n.lv) * 자원전역배율
               // 사냥터 3 (허수광산) → 크레딧 + 돈 동시 (풍요/풍성/부유/세공 보주 배수)
               if (tier === 3) {
                 추가크레딧 += Math.max(1, Math.floor(dmg / 1000 * 광산크레딧배수))
@@ -2106,7 +2114,7 @@ export default function App() {
       if (고유DPS > 0) {
         // 고유유닛 위치는 1|2뿐 (사3 진입 X). 단수효과는 채광력보너스로 별도 적용.
         const 고유단가 = 고유유닛스텟cur.위치 === 1 ? 1 : 10000
-        추가미네랄 += 고유DPS * 고유단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * dt
+        추가미네랄 += 고유DPS * 고유단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * dt * 자원전역배율
       }
       // 고유유닛 dest 보간 이동 (smooth)
       if (고유유닛destRef.current) {
