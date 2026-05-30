@@ -3392,7 +3392,7 @@ export default function App() {
         })}
 
         {/* BOSS: 10단계까지. ExtraBoss 제거 */}
-        {!내부계산모드 && 현재화면 === 'boss' && 적들.map(e => {
+        {현재화면 === 'boss' && 적들.map(e => {
           const flash = e.flashUntil > now
           const gate = 보스DPS게이트(보스처치수 + 1)
           const ok = 사냥터DPS >= gate
