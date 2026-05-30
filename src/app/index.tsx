@@ -2593,10 +2593,12 @@ export default function App() {
   }
 
   // 화면맞춤 scale 적용 시 locationX/Y는 화면(scaled) 좌표 → 필드 논리좌표로 환산
-  const 터치좌표 = (e: any): Pos => ({
-    x: e.nativeEvent.locationX / 배율Ref.current,
-    y: e.nativeEvent.locationY / 배율Ref.current,
-  })
+  // 웹: CSS zoom 적용 시 locationX/Y는 zoom된(화면) 좌표 → ÷배율로 필드 논리좌표 환산.
+  // 네이티브: transform scale은 locationX에 영향 없음 + 배율 항상 1이므로 보정 안 함(÷1).
+  const 터치좌표 = (e: any): Pos => {
+    const 보정 = Platform.OS === 'web' ? 배율Ref.current : 1
+    return { x: e.nativeEvent.locationX / 보정, y: e.nativeEvent.locationY / 보정 }
+  }
   const fieldResponderProps = {
     onStartShouldSetResponder: () => true,
     onMoveShouldSetResponder: () => true,
