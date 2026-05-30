@@ -1370,6 +1370,19 @@ export default function App() {
   const _초월r = 초월스텟
   const _일반공업r = 일반스텟.유닛공업
   const 사냥터DPS = 보스존마린들.filter(m => m.state === 'attacking').reduce((s, m) => s + 공격력(m.lv, _초월r, _일반공업r) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
+  // 타격수 측정기: 보스 10클리어 후, 26강+ 마린 중 단위시간당 타격수 1위 유닛을 측정기수만큼 복제해 타격수(=총공격수) 자동 누적.
+  // 50강↓ = 공속 기반(초당 타격수), 51강+ = 데미지×공속(초당 딜).
+  const 측정기활성 = 보스처치수 >= 10
+  const 측정기수 = 4 + Math.min(보석.강타 || 0, 8)
+  let 측정기best = 0, _측정기유닛초당 = 0
+  for (const m of 마린들) {
+    if (m.lv < 26) continue
+    const hits = 공격속도(m.lv) * _공속배수r * 연타수(m.lv)
+    const 초당 = m.lv >= 51 ? (공격력(m.lv, _초월r, _일반공업r) * _공격력배수r * hits * (1 + _크리r)) : hits
+    if (초당 > _측정기유닛초당) { _측정기유닛초당 = 초당; 측정기best = m.lv }
+  }
+  const 측정기타격수초당 = (측정기활성 && 측정기best > 0) ? 측정기수 * _측정기유닛초당 : 0
+  const 측정기타격수초당Ref = useRef(0); 측정기타격수초당Ref.current = 측정기타격수초당
   const 현재배수 = 자원배수(Math.max(사냥터DPS, 최고DPS)) * (1 + _보주배수r)
   const 사냥터마린DPS = 사냥터마린들.reduce((s, m) => s + 공격력(m.lv, _초월r, _일반공업r) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
   const 시간당미네랄 = 사냥터마린DPS * 현재배수 * (1 + _보주자원r) * 3600
@@ -1864,8 +1877,7 @@ export default function App() {
               // 보스 데미지 보너스 (초월스텟 보스데미지 +10%/pt)
               const 보스데미지배수 = 1  // 신규 초월스텟에 보스데미지 없음 (보스공격력보너스로 대체됨)
               const dmgShow = Math.round(공격력(n.lv, 초월s, 스텟.유닛공업) * 공격력배수 * 보스데미지배수 * 연타수(n.lv) * (isCrit ? 2 : 1))
-              // 타격수: 41강+ 데미지 그대로 반영, 미만은 +1
-              추가공격수 += n.lv >= 51 ? dmgShow : 1
+              // (타격수는 사냥/보스 공격이 아닌 '타격수 측정기'에서만 누적 — 아래 측정기 블록)
               if (Math.random() < 0.4) {
                 const fid = dmgIdRef.current++
                 setDmg플로팅들(prev => [...prev.slice(-20), {
@@ -1918,8 +1930,7 @@ export default function App() {
               if (tier === 3) {
                 추가크레딧 += Math.max(1, Math.floor(dmg / 1000 * 광산크레딧배수))
               }
-              // 타격수: 41강+ 데미지 그대로, 미만은 +1
-              추가공격수 += n.lv >= 51 ? Math.round(dmg) : 1
+              // (타격수는 '타격수 측정기'에서만 누적)
               플래시몹.push(target.id)
               몹데미지맵.set(target.id, (몹데미지맵.get(target.id) ?? 0) + dmg)
             }
@@ -2096,6 +2107,9 @@ export default function App() {
       if (판매ExP > 0) setExPoint(prev => prev + 판매ExP)
       if (추가초월경험 > 0) 초월경험획득(추가초월경험)
 
+      // 타격수 측정기: 보스 10클리어 후 26강+ best유닛 × 측정기수 만큼 초당 타격수 누적
+      if (측정기타격수초당Ref.current > 0) 추가공격수 += 측정기타격수초당Ref.current * dt
+
       if (추가공격수 > 0) {
         const 새공격수 = 총공격수Ref.current + 추가공격수
         set총공격수(새공격수)
@@ -2186,8 +2200,10 @@ export default function App() {
         const 새보스 = baseN + 1
         const 새배수 = 1 + Math.min(새보스, 10) * 0.5
         if (새보스 >= 10) {
-          set적들([])  // 보스존 종료
-          메시지표시(`🌌 10보스 전체 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+500 · 보스존 종료`)
+          set적들([])  // 보스존 종료 → 타격수 측정기 시스템으로 전환
+          // 보스존 마린 전원 베이스로 자동 퇴장
+          set마린들(prev => prev.map(m => m.location === 'boss' ? { ...m, location: 'base' as const, dest: null, state: 'idle' as const, 타겟적id: null } : m))
+          메시지표시(`🌌 10보스 전체 클리어! 보스존 마린 퇴장 → 타격수 측정기 가동!`)
         } else {
           메시지표시(`⚔️ 보스 ${새보스}/10 클리어! 공격력 ×${새배수.toFixed(1)} · Lv+500 · 사냥터+4 🔮+${조각드랍}`)
         }
@@ -3295,10 +3311,27 @@ export default function App() {
             </View>
           )
         })}
-        {현재화면 === 'boss' && 적들.length === 0 && (
-          <Text style={{ position: 'absolute', top: '40%', width: '100%', textAlign: 'center', color: '#a855f7', fontSize: 18 }}>
-            🌌 보스존 종료 (타격수 시스템으로)
-          </Text>
+        {현재화면 === 'boss' && 적들.length === 0 && 측정기활성 && (
+          <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, width: 필드_W, height: 필드_H }}>
+            <Text style={{ position: 'absolute', top: 30, width: 필드_W, textAlign: 'center', color: '#7ed957', fontSize: 14, fontWeight: 'bold' }}>
+              🎯 타격수 측정기 ({측정기수}기)
+            </Text>
+            <Text style={{ position: 'absolute', top: 52, width: 필드_W, textAlign: 'center', color: '#cfd6e4', fontSize: 11 }}>
+              {측정기best > 0
+                ? `측정 유닛: ${측정기best}강 · +${숫자포맷(Math.round(측정기타격수초당))} 타격수/초`
+                : '⚠️ 26강+ 유닛을 생산하면 측정 시작'}
+            </Text>
+            {측정기best > 0 && Array.from({ length: 측정기수 }).map((_, i) => {
+              const 열 = 6
+              const cx = 필드_W / 2 + ((i % 열) - (열 - 1) / 2) * 46
+              const cy = 필드_H * 0.42 + Math.floor(i / 열) * 50
+              return (
+                <View key={i} style={{ position: 'absolute', left: cx - 17, top: cy - 17, width: 34, height: 34, borderRadius: 17, backgroundColor: 마린색(측정기best), alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
+                  <Text style={{ fontSize: 16 }}>🎯</Text>
+                </View>
+              )
+            })}
+          </View>
         )}
 
         {/* 마린 (현재 화면에 있는 마린만) */}
