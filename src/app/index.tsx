@@ -2109,9 +2109,8 @@ export default function App() {
         }
       }
 
-      // 고유유닛 DPS 기여 — 사냥터에 마린이 있을 때만 수입 발생 (혼자선 돈 안 벌게).
-      const 사냥마린있음 = currentMarines.some(m => is사냥터(m.location))
-      if (고유DPS > 0 && 사냥마린있음) {
+      // 고유유닛 DPS 기여 (사냥터 배치 상시 적용 — 마린 없어도 단독 수입)
+      if (고유DPS > 0) {
         // 고유유닛 위치는 1|2뿐 (사3 진입 X). 단수효과는 채광력보너스로 별도 적용.
         const 고유단가 = 고유유닛스텟cur.위치 === 1 ? 1 : 10000
         추가미네랄 += 고유DPS * 고유단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * dt * 자원전역배율
