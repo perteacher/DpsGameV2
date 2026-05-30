@@ -2505,6 +2505,26 @@ export default function App() {
     메시지표시(`⭐${숫자포맷(변환ExP)} → 💰${숫자포맷(획득크레딧)} 크레딧`)
   }
 
+  // ExP 뽑기: 1뽑기당 EXP_뽑기비용 ExP. 기본 무색조각 50 + 확률 추가지급. 배수(횟수) 지원.
+  const EXP_뽑기비용 = 1
+  function ExP뽑기(횟수: number) {
+    const cost = 횟수 * EXP_뽑기비용
+    if (ExPointRef.current < cost) { 메시지표시(`⭐ ExP ${숫자포맷(cost)} 필요`); return }
+    let 무색 = 0, 크레딧드 = 0, 각성 = 0
+    for (let i = 0; i < 횟수; i++) {
+      무색 += 50  // 기본 지급
+      if (Math.random() < 0.0005) 크레딧드 += 600000000  // 크레딧 6억 0.05%
+      if (Math.random() < 0.0015) 각성 += 1               // 각성석 1개 0.15%
+      if (Math.random() < 0.01) 무색 += 20000             // 무색 2만 1%
+      if (Math.random() < 0.10) 무색 += 500               // 무색 500 10%
+    }
+    setExPoint(p => p - cost)
+    if (무색 > 0) set무색조각(p => p + 무색)
+    if (크레딧드 > 0) set크레딧(p => p + 크레딧드)
+    if (각성 > 0) set각성의보석(p => p + 각성)
+    메시지표시(`🎰 ${숫자포맷(횟수)}뽑기! 🔷${숫자포맷(무색)}${크레딧드 > 0 ? ` 💰${숫자포맷(크레딧드)}` : ''}${각성 > 0 ? ` 💎${각성}각성석` : ''}`)
+  }
+
   // 고유유닛 강화 (크레딧 사용)
   const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치' | '단수'>, (lv: number) => number> = {
     공격력:   lv => (lv + 1) * 100,
@@ -2988,6 +3008,26 @@ export default function App() {
               )
             })}
           </View>
+
+          <Text style={styles.currencySection}>🎰 ExP 뽑기 (1뽑기 = ⭐{EXP_뽑기비용})</Text>
+          <Text style={{ color: '#888', fontSize: 9, marginBottom: 3 }}>
+            기본 🔷무색 50 + 확률: 💰6억(0.05%) · 💎각성석(0.15%) · 🔷2만(1%) · 🔷500(10%)
+          </Text>
+          <View style={styles.currencyBtnRow}>
+            {[1, 10, 100, 1000].map(n => {
+              const cost = n * EXP_뽑기비용
+              return (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.upgBtn, ExPoint < cost && styles.upgBtnOff, { minWidth: 70, paddingHorizontal: 6 }]}
+                  onPress={() => ExP뽑기(n)}
+                >
+                  <Text style={[styles.upgBtnText, { fontSize: 12 }]}>×{n}</Text>
+                  <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(cost)}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
           </ScrollView>
         </View>
       )}
@@ -3418,7 +3458,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.prodSubtitle}>Lv.{캐릭레벨} · {캐릭레벨 >= 캐릭레벨최대 ? (초월레벨 > 0 ? `초월XP ${숫자포맷(초월경험치)}/${숫자포맷(다음초월경험치(초월레벨))}` : `MAX (초월 미해금)`) : `XP ${경험치}/${다음경험치(캐릭레벨)}`} · 포인트 {잔여포인트} · 초월포인트 {초월잔여포인트}</Text>
+          <Text style={styles.prodSubtitle}>Lv.{캐릭레벨} · {캐릭레벨 >= 캐릭레벨최대 ? (초월레벨 > 0 ? `초월XP ${숫자포맷(초월경험치)}/${숫자포맷(다음초월경험치(초월레벨))}` : `MAX (초월 미해금)`) : `XP ${숫자포맷(경험치)}/${숫자포맷(다음경험치(캐릭레벨))}`} · 포인트 {잔여포인트} · 초월포인트 {초월잔여포인트}</Text>
           {(최고마린lv >= 55 || 융합누적 > 0) && (
             <Text style={[styles.prodSubtitle, { color: '#c89bff' }]}>🔮 56강 융합 누적: {숫자포맷(융합누적)} / {숫자포맷(Math.max(1, 20000 - 보주.절약 * 10))} (55강 마린이 강화소 도달 시 흡수)</Text>
           )}
