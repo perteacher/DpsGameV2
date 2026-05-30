@@ -2082,9 +2082,9 @@ export default function App() {
         보스킬쿨다운Ref.current = now
         const baseN = 보스처치수Ref.current
         set보스처치수(prev => prev + 1)
-        // 보스 클리어 → 레벨 +500 (잔여포인트도 +500)
+        // 보스 클리어 → 레벨 +500 (레벨당 5포인트 → +2500)
         set캐릭레벨(prev => prev + 500)
-        set잔여포인트(prev => prev + 500)
+        set잔여포인트(prev => prev + 2500)
         if (Platform.OS !== 'web') Vibration.vibrate([0, 100, 50, 100])
         const _보스배수 = 1
         const 조각드랍 = Math.round((baseN + 1) * 10 * (1 + 보주합산(bj, '조각')) * _보스배수)
@@ -2175,8 +2175,8 @@ export default function App() {
     }
     if (lvDelta > 0) {
       set캐릭레벨(prev => prev + lvDelta)
-      set잔여포인트(prev => prev + lvDelta)
-      메시지표시(`🎊 레벨업! +${lvDelta} (+${lvDelta} 포인트)`)
+      set잔여포인트(prev => prev + lvDelta * 5)  // 계산기 기준: 레벨 1당 스탯 5포인트
+      메시지표시(`🎊 레벨업! +${lvDelta} (+${lvDelta * 5} 포인트)`)
     }
     // 만렙(30만) 도달 → 잔여 일반 XP 폐기. 초월경험치는 51강 강화/52강+ 판매로만 (초월경험획득)
     if (simLv + lvDelta >= 캐릭레벨최대) xp = 0
@@ -2250,59 +2250,56 @@ export default function App() {
     if (!chk.ok) { 메시지표시(`⛔ 환생 불가: ${chk.이유}`); return }
     const 보상 = 환생보상ExPoint()
     if (typeof window !== 'undefined' && window.confirm) {
-      if (!window.confirm(`정말 환생할까요?\n\n50강+ 누적 생산 ${숫자포맷(누적50강생산Ref.current)}마리 → 보상 ⭐ ${숫자포맷(보상)} ExPoint\n\n[유지] 환생레벨, ExPoint\n[리셋] 마린/재화/스텟/보주/크리스탈/보석/고유유닛/초월/크레딧`)) return
+      if (!window.confirm(`환생할까요?\n\n50강+ 누적 생산 ${숫자포맷(누적50강생산Ref.current)}마리 → 보상 ⭐ ${숫자포맷(보상)} ExPoint\n\n강화한 것들(마린/스텟/보석/보주/초월/크레딧 등)은 모두 유지됩니다.\n누적 50강+ 생산 카운트만 0으로 초기화됩니다.`)) return
     }
-    const 유지_ExPoint = ExPoint + 보상
-    // 리셋 (게임초기화와 동일하지만 환생 항목 + ExPoint 보존)
-    set마린들(초기마린들())
-    setMineral(100)
-    set총공격수(0)
-    set보스처치수(0)
-    set최고DPS(0)
-    set무색조각(10000); set응무조(0); set크리스탈조각(0); set상급크리스탈조각(0)
-    set보주({ ...초기보주 })
-    set업그레이드({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
-    set캐릭레벨(1); set경험치(0); set잔여포인트(0)
-    set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
-    set초월스텟({ ...초기초월스텟 })
-    set각성의보석(0); setExPoint(유지_ExPoint); set은하조각(0); set자각보주(0)
-    set타격수획득idx(0)
-    setExtraVI받음(0); setExtraXI받음(0)
-    set명칭크리스탈({ ...초기명칭크리스탈 })
-    set명칭크리스탈Lv({})
-    set장착크리스탈([])
-    set크레딧(0)
-    set보석({ ...초기보석 })
-    set고유유닛({ ...초기고유유닛 })
-    set초월레벨(0)
-    set초월잔여포인트(0)
-    set초월경험치(0)
-    set누적강화성공(0); set누적판매(0); set최고마린lv(1); set융합누적(0)
-    set누적50강생산(0)  // 이번 환생 보상으로 정산 완료 → 0부터 다시 누적
-    set몹들(초기몹들())
-    set자동강화ON(false); set자동강화최대lv(1)
-    set자동판매ON(false); set자동판매lv(50)
-    set자동구입강도(1); set자동구입ON(false)
-    set적들(초기적들(1))
-    set선택ID([])
-    set현재화면('base')
-    set생산패널열림(false)
-    // 환생 영구 갱신
+    // 강화한 것들은 전부 유지. ExP 보상만 지급 + 누적50강생산 정산 리셋.
+    setExPoint(p => p + 보상)
+    set누적50강생산(0)
     set환생레벨(v => v + 1)
     set누적환생수(v => v + 1)
     set환생패널열림(false)
     메시지표시(`🌟 환생! ⭐+${숫자포맷(보상)} ExPoint (환생Lv.${환생레벨 + 1})`)
   }
 
-  // 강화 초기화: 강화한 유닛만 베이스 상태로 되돌림 (재화/스텟/크레딧 등은 보존)
-  function 강화초기화() {
-    if (typeof window !== 'undefined' && window.confirm) {
-      if (!window.confirm('강화한 유닛을 전부 초기화할까요?\n\n마린이 모두 사라지고 처음 상태로 돌아갑니다.\n(재화/스텟/크레딧/고유유닛/초월 등은 유지)')) return
+  // ===== 강화 카테고리별 초기화 (해당 강화에 쓴 자원/포인트 전액 환불) =====
+  function 스텟초기화() {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('일반 스텟을 초기화할까요?\n\n분배한 스텟이 모두 풀리고 쓴 포인트를 전액 환불합니다.')) return
+    let 환불 = 0
+    const cur = 일반스텟Ref.current
+    for (const m of 일반스텟표) 환불 += (cur[m.key] || 0) * m.cost
+    set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
+    set잔여포인트(p => p + 환불)
+    메시지표시(`📊 스텟 초기화 — ${숫자포맷(환불)}P 환불`)
+  }
+  function 초월스텟초기화() {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('초월 스텟을 초기화할까요?\n\n분배한 초월 스텟이 모두 풀리고 쓴 초월 포인트를 전액 환불합니다.')) return
+    let 환불 = 0
+    const cur = 초월스텟Ref.current
+    for (const m of 초월스텟표) 환불 += ((cur as any)[m.key] || 0) * m.cost
+    set초월스텟({ ...초기초월스텟 })
+    set초월잔여포인트(p => p + 환불)
+    메시지표시(`🌀 초월 스텟 초기화 — ${숫자포맷(환불)}P 환불`)
+  }
+  function 보석초기화() {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('보석을 초기화할까요?\n\n모든 보석이 0이 되고 쓴 무색조각을 전액 환불합니다.')) return
+    let 환불 = 0
+    const cur = 보석Ref.current
+    for (const 종류 of Object.keys(초기보석) as 보석타입[]) {
+      const n = cur[종류] || 0
+      for (let i = 0; i < n; i++) 환불 += 보석현재비용(종류, i)
     }
-    set마린들(초기마린들())
-    set선택ID([])
-    set현재화면('base')
-    메시지표시('🧹 강화 유닛 초기화됨')
+    set보석({ ...초기보석 })
+    set무색조각(p => p + 환불)
+    메시지표시(`💠 보석 초기화 — 🔷${숫자포맷(환불)} 환불`)
+  }
+  function 보주초기화() {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('보주를 초기화할까요?\n\n모든 보주가 0이 되고 쓴 응무조를 전액 환불합니다.')) return
+    let 환불 = 0
+    const cur = 보주Ref.current
+    for (const 종류 of Object.keys(초기보주) as 보주타입[]) 환불 += (cur[종류] || 0) * 보주구입비용[종류]
+    set보주({ ...초기보주 })
+    set응무조(p => p + 환불)
+    메시지표시(`🔮 보주 초기화 — 💠${숫자포맷(환불)} 환불`)
   }
 
   // 보주 구입 (응무조 사용, 수량 지정)
@@ -3608,7 +3605,7 @@ export default function App() {
             </TouchableOpacity>
             <View style={styles.divider} />
             <Text style={[styles.prodSubtitle, { color: '#aaa', fontSize: 11 }]}>
-              ※ 환생은 마린/재화/스텟/크레딧/고유유닛/초월을 리셋합니다 (환생레벨·ExPoint는 유지)
+              ※ 환생해도 강화한 것들(마린/스텟/보석/보주/초월/크레딧 등)은 모두 유지됩니다. 누적 50강+ 생산 카운트만 0으로 정산됩니다.
             </Text>
           </View>
         )
@@ -3725,12 +3722,22 @@ export default function App() {
         </View>
       )}
 
-      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
-        <TouchableOpacity style={styles.resetButton} onPress={강화초기화}>
-          <Text style={styles.resetButtonText}>🧹 강화 초기화</Text>
+      <Text style={[styles.resetButtonText, { textAlign: 'center', marginBottom: 2 }]}>🧹 강화 초기화 (쓴 자원/포인트 환불)</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+        <TouchableOpacity style={styles.resetButton} onPress={스텟초기화}>
+          <Text style={styles.resetButtonText}>📊 스텟</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.resetButton} onPress={보석초기화}>
+          <Text style={styles.resetButtonText}>💠 보석</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.resetButton} onPress={보주초기화}>
+          <Text style={styles.resetButtonText}>🔮 보주</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.resetButton} onPress={초월스텟초기화}>
+          <Text style={styles.resetButtonText}>🌀 초월스텟</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.resetButton} onPress={게임초기화}>
-          <Text style={styles.resetButtonText}>🔄 전체 초기화</Text>
+          <Text style={styles.resetButtonText}>🔄 전체</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
