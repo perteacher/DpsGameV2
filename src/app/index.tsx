@@ -1327,6 +1327,10 @@ export default function App() {
   const 사냥터2마린들 = 마린들.filter(m => m.location === 'hunting2')
   const 사냥터3마린들 = 마린들.filter(m => m.location === 'hunting3')
   const 보스존마린들 = 마린들.filter(m => m.location === 'boss')
+
+  // 촉진합 = 보석+일반+초월+단수. 자동구입 틱당 선택 가능한 최대 = 10 + 촉진합
+  const 촉진합 = (보석.촉진 || 0) + (일반스텟.촉진 || 0) + (초월스텟.촉진 || 0) + Math.floor(((고유유닛.단수 || 1) - 1) / 10)
+  const 최대틱수 = 10 + 촉진합
   const 화면마린들 = 현재화면 === 'hunting1' ? 사냥터1마린들
     : 현재화면 === 'hunting2' ? 사냥터2마린들
     : 현재화면 === 'hunting3' ? 사냥터3마린들
@@ -1514,7 +1518,7 @@ export default function App() {
           if (typeof d.자동판매lv === 'number') set자동판매lv(Math.max(15, d.자동판매lv))
           if (typeof d.자동구입강도 === 'number') set자동구입강도(d.자동구입강도)
           if (typeof d.자동구입ON === 'boolean') set자동구입ON(d.자동구입ON)
-          if (typeof d.자동구입배수 === 'number') set자동구입배수(Math.max(1, Math.min(10, d.자동구입배수)))
+          if (typeof d.자동구입배수 === 'number') set자동구입배수(Math.max(1, d.자동구입배수))
           if (d.업그레이드 && typeof d.업그레이드 === 'object') set업그레이드(prev => ({ ...prev, ...d.업그레이드}))
           if (typeof d.캐릭레벨 === 'number') set캐릭레벨(d.캐릭레벨)
           if (typeof d.경험치 === 'number') set경험치(d.경험치)
@@ -2124,7 +2128,9 @@ export default function App() {
         const lv = Math.min(50, 자동구입강도Ref.current)  // 구입은 50강까지만
         const cost = 생산비용(lv)
         const 단수촉진 = Math.floor(((고유유닛Ref.current.단수 || 1) - 1) / 10)  // 고유유닛 단수 10단마다 촉진 +1
-        const 배수 = 자동구입배수Ref.current + (보석Ref.current.촉진 || 0) + (일반스텟Ref.current.촉진 || 0) + (초월스텟Ref.current.촉진 || 0) + 단수촉진  // 촉진(보석+일반+초월+단수) 1당 자동생산 +1마리
+        const 틱촉진합 = (보석Ref.current.촉진 || 0) + (일반스텟Ref.current.촉진 || 0) + (초월스텟Ref.current.촉진 || 0) + 단수촉진
+        const 틱최대 = 10 + 틱촉진합  // 촉진이 선택 가능한 최대치를 올림(강제 하한 X)
+        const 배수 = Math.min(Math.max(1, 자동구입배수Ref.current), 틱최대)  // 슬라이더로 1~최대 자유 선택
         const 가용 = 잔여Mineral + 추가미네랄
         const 슬롯여유 = 최대유닛수 - 총마린수예상
         // 선형 구입: 1마리당 cost. 구입수 = min(배수, 슬롯여유, 살 수 있는 만큼). 비용 = cost × 구입수.
@@ -4120,17 +4126,17 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {/* 자동 구입 배수 (1~10) */}
+          {/* 자동 구입 틱당 마린수 (1 ~ 최대틱수). 촉진이 최대치를 올림 */}
           <View style={styles.sliderRow}>
-            <Text style={styles.sliderLabel}>📦 배수 ×</Text>
+            <Text style={styles.sliderLabel}>📦 틱당</Text>
             <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.max(1, v - 1))}>
               <Text style={styles.sliderArrowText}>◀</Text>
             </TouchableOpacity>
-            <Text style={styles.sliderValue}>{자동구입배수}</Text>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.min(10, v + 1))}>
+            <Text style={styles.sliderValue}>{Math.min(자동구입배수, 최대틱수)}</Text>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.min(최대틱수, v + 1))}>
               <Text style={styles.sliderArrowText}>▶</Text>
             </TouchableOpacity>
-            <Text style={{ color: '#aaa', fontSize: 10 }}>tick당 {자동구입배수 + (보석.촉진 || 0) + (일반스텟.촉진 || 0) + (초월스텟.촉진 || 0) + Math.floor(((고유유닛.단수 || 1) - 1) / 10)}마리 (슬라이더 {자동구입배수} + 🚀보석 {보석.촉진 || 0} + 일반 {일반스텟.촉진 || 0} + 초월 {초월스텟.촉진 || 0} + 단수 {Math.floor(((고유유닛.단수 || 1) - 1) / 10)})</Text>
+            <Text style={{ color: '#aaa', fontSize: 10 }}>마리 / tick (최대 {최대틱수} = 기본10 + 🚀촉진 {촉진합})</Text>
           </View>
         </View>
       )}
