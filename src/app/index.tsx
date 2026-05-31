@@ -1265,6 +1265,7 @@ export default function App() {
   const 최고DPSRef = useRef(최고DPS); 최고DPSRef.current = 최고DPS
   const 보주Ref = useRef(보주); 보주Ref.current = 보주
   const 무색조각Ref = useRef(무색조각); 무색조각Ref.current = 무색조각
+  const 내부계산모드Ref = useRef(내부계산모드); 내부계산모드Ref.current = 내부계산모드
   const 응무조Ref = useRef(응무조); 응무조Ref.current = 응무조
   const 크리스탈조각Ref = useRef(크리스탈조각); 크리스탈조각Ref.current = 크리스탈조각
   const 상급크리스탈조각Ref = useRef(상급크리스탈조각); 상급크리스탈조각Ref.current = 상급크리스탈조각
@@ -2114,14 +2115,16 @@ export default function App() {
       }
       set마린들(finalMarines2)
 
-      // 자동 구입 (총 마린 1000 미만). 배수만큼 한 tick에 일괄 구입
+      // 자동 구입 (총 마린 상한 미만). 배수만큼 한 tick에 일괄 구입
+      // 내부계산모드(렌더 OFF) 시 상한 대폭↑, 스프라이트 렌더 시엔 렉 방지 위해 낮게
+      const 최대유닛수 = 내부계산모드Ref.current ? 5000 : 1500
       const 총마린수예상 = currentMarines.length - 판매수집.length
-      if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 1000) {
+      if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 최대유닛수) {
         const lv = 자동구입강도Ref.current
         const cost = 생산비용(lv)
         const 배수 = 자동구입배수Ref.current + (보석Ref.current.촉진 || 0) + (일반스텟Ref.current.촉진 || 0) + (초월스텟Ref.current.촉진 || 0)  // 촉진(보석+일반+초월) 1당 자동생산 +1마리
         const 가용 = 잔여Mineral + 추가미네랄
-        const 슬롯여유 = 1000 - 총마린수예상
+        const 슬롯여유 = 최대유닛수 - 총마린수예상
         // 선형 구입: 1마리당 cost. 구입수 = min(배수, 슬롯여유, 살 수 있는 만큼). 비용 = cost × 구입수.
         const 구입수 = Math.min(배수, 슬롯여유, Math.floor(가용 / cost))
         if (구입수 > 0) {
@@ -2710,8 +2713,9 @@ export default function App() {
   function 유닛구매(강도: number, 수량: number = 1) {
     const 단가 = 생산비용(강도)
     const 총마린수 = 마린들Ref.current.length
-    if (총마린수 >= 1000) { 메시지표시('🚫 마린 가득참 (총 1000 최대)'); return }
-    const 여유 = 1000 - 총마린수
+    const 최대유닛수 = 내부계산모드Ref.current ? 5000 : 1500
+    if (총마린수 >= 최대유닛수) { 메시지표시(`🚫 마린 가득참 (총 ${최대유닛수} 최대)`); return }
+    const 여유 = 최대유닛수 - 총마린수
     const 가능자원 = Math.floor(mineralRef.current / 단가)
     const 실수량 = Math.min(수량, 여유, 가능자원)
     if (실수량 < 1) {
