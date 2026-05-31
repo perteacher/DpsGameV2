@@ -191,15 +191,33 @@ function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0
     const bonus = (스텟.특수강화 + 스텟.특수강화2) * 0.001 + 외부p1
     return r < Math.min(0.95, bonus) ? 1 : 0
   }
-  // 1~39강: base 확률만 (스텟/보석/보주/보스 보너스 전부 미적용) → 밴드 배율(초반/중반)이 시간 직접 제어
-  // 38~39강은 +2/+3 없이 +1만(base×1.11). 그 외 1~37강은 +1/+2/+3 분리.
-  // (스텟/보석은 40강+ 부터 효과 — 위 분기에서 처리)
-  const s1 = Math.min(0.95, 단계 >= 38 ? base * 1.11 : base)
-  const s2 = 단계 >= 38 ? 0 : Math.min(0.95, base / 10)
-  const s3 = 단계 >= 38 ? 0 : Math.min(0.95, base / 100)
-  if (r < s3) return 3
-  if (r < s3 + s2) return 2
-  if (r < s3 + s2 + s1) return 1
+  // 1~25강: base 확률만 (스텟/보석/보주/보스 미적용) → 강화배율_초반이 시간 직접 제어
+  if (단계 <= 25) {
+    const s1 = Math.min(0.95, base)
+    const s2 = Math.min(0.95, base / 10)
+    const s3 = Math.min(0.95, base / 100)
+    if (r < s3) return 3
+    if (r < s3 + s2) return 2
+    if (r < s3 + s2 + s1) return 1
+    return 0
+  }
+  // 26~39강: 스텟/외부 보너스 적용 (base는 강화배율_중반 반영)
+  const 특수가산 = (스텟.특수강화 + 스텟.특수강화2) * 0.001
+  if (단계 >= 38 && 단계 <= 39) {
+    const p1 = Math.min(0.95,
+      base * 1.11
+      + (스텟.가산1강 + 스텟.가산1강2 + 스텟.가산2강 + 스텟.가산2강2 + 스텟.가산3강 + 스텟.가산3강2) * 0.001
+      + 특수가산
+      + 외부p1 + 일반p1)
+    return r < p1 ? 1 : 0
+  }
+  // 26~37강: +1/+2/+3 분리 (일반확률 + 특수확률)
+  const p3 = Math.min(0.95, base / 100 + (스텟.가산3강 + 스텟.가산3강2) * 0.001 + 특수가산)
+  const p2 = Math.min(0.95, base / 10  + (스텟.가산2강 + 스텟.가산2강2) * 0.001 + 특수가산)
+  const p1 = Math.min(0.95, base       + (스텟.가산1강 + 스텟.가산1강2) * 0.001 + 특수가산 + 외부p1 + 일반p1)
+  if (r < p3) return 3
+  if (r < p3 + p2) return 2
+  if (r < p3 + p2 + p1) return 1
   return 0
 }
 
@@ -3010,7 +3028,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B7</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B8</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
