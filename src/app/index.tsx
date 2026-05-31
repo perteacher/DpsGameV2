@@ -1426,7 +1426,7 @@ export default function App() {
     }
     return { 타입, 확률, 판매, 구입: lv >= 1 && lv <= 56 ? 생산비용(lv) : 0, 공격력: 공당, 공속: 공속초.toFixed(2) + '/초', dps, 판매획득, 내역 }
   }
-  const _보스공격력보너스r = 1 + Math.min(보스처치수, 10) * 0.5  // 보스1=×1.5 ... 보스10=×6
+  const _보스공격력보너스r = 1  // 보스 데미지업 제거 (사용자 요청)
   const _공격력배수r = (1 + _보주공격r + 업그레이드.공격력 * 0.03) * _보스공격력보너스r
   const _공속배수r = 1 + _보주공속r + 업그레이드.공속 * 0.02
   const _크리r = Math.min(0.95, _보주크리r)
@@ -1642,7 +1642,7 @@ export default function App() {
       const 고유유닛스텟cur = 고유유닛Ref.current
       const 고유DPS = 고유유닛DPS(고유유닛스텟cur)
       const 초월lv = 초월레벨Ref.current
-      const 보스공격력보너스 = 1 + Math.min(보스처치수Ref.current, 10) * 0.5  // 보스1=×1.5 ... 보스10=×6
+      const 보스공격력보너스 = 1  // 보스 데미지업 제거 (사용자 요청)
       const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03) * 보스공격력보너스  // 유닛공업은 공격력() 내부에서 처리
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
