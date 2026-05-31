@@ -1200,6 +1200,10 @@ export default function App() {
   const [도움말패널열림, set도움말패널열림] = useState(false)
   const [정보패널열림, set정보패널열림] = useState(false)
   const [정보단계, set정보단계] = useState(1)  // 정보 패널에서 보고 있는 강화 단계
+  const [상점패널열림, set상점패널열림] = useState(false)
+  // 시간제 쿠폰: 만료 시각(ms). now < 만료 면 활성. 1개 구입 = +1시간, 최대 60시간 누적.
+  const [경험쿠폰만료, set경험쿠폰만료] = useState(0)  // 15~44강 판매 경험치 3배
+  const [재화쿠폰만료, set재화쿠폰만료] = useState(0)  // 45~50강 판매 재화 2배
   const [자동구입배수, set자동구입배수] = useState<number>(1)
   const [내부계산모드, set내부계산모드] = useState(false)  // 렌더 OFF → 렉 해소
   // 신규 재화 (원본 맵 기반)
@@ -1277,6 +1281,8 @@ export default function App() {
   const 융합누적Ref = useRef(융합누적); 융합누적Ref.current = 융합누적
   const 각성의보석Ref = useRef(각성의보석); 각성의보석Ref.current = 각성의보석
   const ExPointRef = useRef(ExPoint); ExPointRef.current = ExPoint
+  const 경험쿠폰만료Ref = useRef(경험쿠폰만료); 경험쿠폰만료Ref.current = 경험쿠폰만료
+  const 재화쿠폰만료Ref = useRef(재화쿠폰만료); 재화쿠폰만료Ref.current = 재화쿠폰만료
   const 은하조각Ref = useRef(은하조각); 은하조각Ref.current = 은하조각
   const 자각보주Ref = useRef(자각보주); 자각보주Ref.current = 자각보주
   const 타격수획득idxRef = useRef(타격수획득idx); 타격수획득idxRef.current = 타격수획득idx
@@ -1523,6 +1529,8 @@ export default function App() {
           if (typeof d.초월경험치 === 'number') set초월경험치(d.초월경험치)
           if (typeof d.각성의보석 === 'number') set각성의보석(d.각성의보석)
           if (typeof d.ExPoint === 'number') setExPoint(d.ExPoint)
+          if (typeof d.경험쿠폰만료 === 'number') set경험쿠폰만료(d.경험쿠폰만료)
+          if (typeof d.재화쿠폰만료 === 'number') set재화쿠폰만료(d.재화쿠폰만료)
           if (typeof d.은하조각 === 'number') set은하조각(d.은하조각)
           if (typeof d.자각보주 === 'number') set자각보주(d.자각보주)
           if (typeof d.타격수획득idx === 'number') set타격수획득idx(d.타격수획득idx)
@@ -1564,7 +1572,7 @@ export default function App() {
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈, 명칭크리스탈Lv, 장착크리스탈,
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트, 초월경험치,
-      각성의보석, ExPoint, 은하조각, 자각보주,
+      각성의보석, ExPoint, 경험쿠폰만료, 재화쿠폰만료, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 누적50강생산,
       누적강화성공, 누적판매, 최고마린lv, 융합누적,
@@ -1579,7 +1587,7 @@ export default function App() {
       캐릭레벨, 경험치, 잔여포인트,
       일반스텟, 초월스텟, 명칭크리스탈, 명칭크리스탈Lv, 장착크리스탈,
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트, 초월경험치,
-      각성의보석, ExPoint, 은하조각, 자각보주,
+      각성의보석, ExPoint, 경험쿠폰만료, 재화쿠폰만료, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 누적50강생산,
       누적강화성공, 누적판매, 최고마린lv, 융합누적,
@@ -2058,17 +2066,21 @@ export default function App() {
       const 각성배수 = 1 + eqCnt('각성') * 1.0 + eqCnt('노랑') * 1.0 + eqCnt('우주') * 5.0
       // 크레딧은 이미 사전 검증됨 (판매소 진입 시점). 판매수집 = 판매 확정 마린
       const 총소모크레딧 = 크레딧Ref.current - 가용크레딧Tick
+      const 경험쿠폰활성 = now < 경험쿠폰만료Ref.current
+      const 재화쿠폰활성 = now < 재화쿠폰만료Ref.current
       for (const s of 판매수집) {
         const r = 판매보상(s.lv)
-        판매무색 += Math.round(r.무색조각 * 판매보상배수 * 무색배수)
-        판매응무조 += Math.round(r.응무조 * 판매보상배수)
-        판매크리조각 += Math.round(r.크리스탈조각 * 판매보상배수 * 조각배수)
-        판매ExP += Math.round(r.ExP * 판매보상배수)
-        판매각성 += Math.round(r.각성보석 * 각성배수)
+        const 경x = 경험쿠폰활성 ? 3 : 1            // 15~44강 판매 경험치 3배 (일반XP는 15~44만 발생)
+        const 재x = (재화쿠폰활성 && s.lv >= 45 && s.lv <= 50) ? 2 : 1  // 45~50강 판매 재화 2배
+        판매무색 += Math.round(r.무색조각 * 판매보상배수 * 무색배수 * 재x)
+        판매응무조 += Math.round(r.응무조 * 판매보상배수 * 재x)
+        판매크리조각 += Math.round(r.크리스탈조각 * 판매보상배수 * 조각배수 * 재x)
+        판매ExP += Math.round(r.ExP * 판매보상배수 * 재x)
+        판매각성 += Math.round(r.각성보석 * 각성배수 * 재x)
         판매은하 += r.은하조각
         판매자각 += r.자각보주
-        판매일반XP += Math.round(r.일반XP * 판매보상배수)
-        판매크레딧 += Math.round(r.크레딧 * 판매보상배수)
+        판매일반XP += Math.round(r.일반XP * 판매보상배수 * 경x)
+        판매크레딧 += Math.round(r.크레딧 * 판매보상배수 * 재x)
         if (s.lv >= 52) 추가초월경험 += 판매초월경험표[s.lv] ?? 0  // 52강+ 판매 → 초월경험치
         for (const 등급 of r.박스) 판매크리스탈드랍.push(박스개봉(등급))
       }
@@ -2568,6 +2580,21 @@ export default function App() {
     메시지표시(`🎰 ${숫자포맷(횟수)}뽑기! 🔷${숫자포맷(무색)}${크레딧드 > 0 ? ` 💰${숫자포맷(크레딧드)}` : ''}${각성 > 0 ? ` 💎${각성}각성석` : ''}`)
   }
 
+  // 시간제 쿠폰 구입: 1개당 +1시간, 최대 60시간 누적
+  const 쿠폰최대ms = 60 * 3600000
+  function 쿠폰구입(종류: '경험' | '재화') {
+    const 비용 = 종류 === '경험' ? 1 : 50
+    if (ExPointRef.current < 비용) { 메시지표시(`⭐ ExP ${비용} 필요`); return }
+    const now = Date.now()
+    const 현재만료 = 종류 === '경험' ? 경험쿠폰만료Ref.current : 재화쿠폰만료Ref.current
+    const base = Math.max(now, 현재만료)
+    if (base + 3600000 - now > 쿠폰최대ms) { 메시지표시('⛔ 최대 60시간까지'); return }
+    setExPoint(p => p - 비용)
+    const 새만료 = base + 3600000
+    if (종류 === '경험') set경험쿠폰만료(새만료); else set재화쿠폰만료(새만료)
+    메시지표시(`${종류 === '경험' ? '📗 경험치 3배' : '💰 재화 2배'} 쿠폰 +1시간`)
+  }
+
   // 고유유닛 강화 (크레딧 사용)
   const 고유유닛강화비용표: Record<keyof Omit<고유유닛스텟, '위치' | '단수'>, (lv: number) => number> = {
     공격력:   lv => (lv + 1) * 100,
@@ -2989,24 +3016,31 @@ export default function App() {
           <Text style={[styles.statSmall, { color: 잔여포인트 > 0 ? '#f5a623' : '#aaa' }]}>Lv.{캐릭레벨}{잔여포인트 > 0 ? ` (+${잔여포인트}P)` : ''}</Text>
           <TouchableOpacity onPress={() => set재화패널열림(v => {
             const next = !v
-            if (next) { set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+            if (next) { set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
             return next
           })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#3a5a8a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>💰 재화</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => set도움말패널열림(v => {
             const next = !v
-            if (next) { set정보패널열림(false); set재화패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+            if (next) { set정보패널열림(false); set재화패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
             return next
           })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#5a3a8a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>📖 도움말</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => set정보패널열림(v => {
             const next = !v
-            if (next) { set도움말패널열림(false); set재화패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+            if (next) { set도움말패널열림(false); set재화패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
             return next
           })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#3a7a5a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>📊 정보</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => set상점패널열림(v => {
+            const next = !v
+            if (next) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+            return next
+          })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#8a5a2a', borderRadius: 4 }}>
+            <Text style={[styles.statSmall, { color: '#fff' }]}>🛒 상점</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -3035,45 +3069,68 @@ export default function App() {
             {초월레벨 > 0 && <Text style={[styles.currencyItem, { color: '#c89bff' }]}>🌀 초월Lv.{초월레벨} ({숫자포맷(초월경험치)}/{숫자포맷(다음초월경험치(초월레벨))})</Text>}
             {환생레벨 > 0 && <Text style={[styles.currencyItem, { color: '#ff6ad9' }]}>🌟 환생Lv.{환생레벨}</Text>}
           </View>
-          <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1 : {숫자포맷(EXP_크레딧환율)})</Text>
-          <View style={styles.currencyBtnRow}>
-            {([['25%', 0.25], ['50%', 0.5], ['전부', 1]] as const).map(([라벨, 비율]) => {
-              const 변환ExP = Math.floor(ExPoint * 비율)
-              return (
-                <TouchableOpacity
-                  key={라벨}
-                  style={[styles.upgBtn, 변환ExP < 1 && styles.upgBtnOff, { minWidth: 100, paddingHorizontal: 6 }]}
-                  onPress={() => ExP를크레딧으로(비율)}
-                >
-                  <Text style={[styles.upgBtnText, { fontSize: 12 }]}>{라벨}</Text>
-                  <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(변환ExP)} → 💰{숫자포맷(변환ExP * EXP_크레딧환율)}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-
-          <Text style={styles.currencySection}>🎰 ExP 뽑기 (1뽑기 = ⭐{EXP_뽑기비용})</Text>
-          <Text style={{ color: '#888', fontSize: 9, marginBottom: 3 }}>
-            기본 🔷무색 50 + 확률: 💰6억(0.05%) · 💎각성석(0.15%) · 🔷2만(1%) · 🔷500(10%)
-          </Text>
-          <View style={styles.currencyBtnRow}>
-            {[1, 10, 100, 1000].map(n => {
-              const cost = n * EXP_뽑기비용
-              return (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.upgBtn, ExPoint < cost && styles.upgBtnOff, { minWidth: 70, paddingHorizontal: 6 }]}
-                  onPress={() => ExP뽑기(n)}
-                >
-                  <Text style={[styles.upgBtnText, { fontSize: 12 }]}>×{n}</Text>
-                  <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(cost)}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
+          <Text style={{ color: '#888', fontSize: 10, marginTop: 6 }}>💡 ExP 교환·뽑기·쿠폰은 🛒 상점에서</Text>
           </ScrollView>
         </View>
       )}
+
+      {상점패널열림 && (() => {
+        const now = Date.now()
+        const 경험남음 = Math.max(0, 경험쿠폰만료 - now)
+        const 재화남음 = Math.max(0, 재화쿠폰만료 - now)
+        const 시간표시 = (ms: number) => ms <= 0 ? '비활성' : `${Math.floor(ms / 3600000)}시간 ${Math.floor((ms % 3600000) / 60000)}분`
+        return (
+          <View style={styles.currencyPanel}>
+            <View style={styles.currencyHeader}>
+              <Text style={styles.currencyTitle}>🛒 상점</Text>
+              <TouchableOpacity onPress={() => set상점패널열림(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.currencyItem, { color: '#a855f7' }]}>⭐ ExP {숫자포맷(ExPoint)}</Text>
+            <ScrollView style={{ maxHeight: 화면H - 360 }}>
+              <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1 : {숫자포맷(EXP_크레딧환율)})</Text>
+              <View style={styles.currencyBtnRow}>
+                {([['25%', 0.25], ['50%', 0.5], ['전부', 1]] as const).map(([라벨, 비율]) => {
+                  const 변환ExP = Math.floor(ExPoint * 비율)
+                  return (
+                    <TouchableOpacity key={라벨} style={[styles.upgBtn, 변환ExP < 1 && styles.upgBtnOff, { minWidth: 100, paddingHorizontal: 6 }]} onPress={() => ExP를크레딧으로(비율)}>
+                      <Text style={[styles.upgBtnText, { fontSize: 12 }]}>{라벨}</Text>
+                      <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(변환ExP)} → 💰{숫자포맷(변환ExP * EXP_크레딧환율)}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Text style={styles.currencySection}>🎰 ExP 뽑기 (1뽑기 = ⭐{EXP_뽑기비용})</Text>
+              <Text style={{ color: '#888', fontSize: 9, marginBottom: 3 }}>기본 🔷무색 50 + 확률: 💰6억(0.05%) · 💎각성석(0.15%) · 🔷2만(1%) · 🔷500(10%)</Text>
+              <View style={styles.currencyBtnRow}>
+                {[1, 10, 100, 1000].map(n => {
+                  const cost = n * EXP_뽑기비용
+                  return (
+                    <TouchableOpacity key={n} style={[styles.upgBtn, ExPoint < cost && styles.upgBtnOff, { minWidth: 70, paddingHorizontal: 6 }]} onPress={() => ExP뽑기(n)}>
+                      <Text style={[styles.upgBtnText, { fontSize: 12 }]}>×{n}</Text>
+                      <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(cost)}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Text style={styles.currencySection}>📗 경험치 3배 쿠폰 (15~44강 판매 XP)</Text>
+              <Text style={{ color: 경험남음 > 0 ? '#7ed957' : '#888', fontSize: 11, marginBottom: 3 }}>남은 시간: {시간표시(경험남음)} · 1개 = ⭐1, +1시간 (최대 60시간)</Text>
+              <TouchableOpacity style={[styles.upgBtn, (ExPoint < 1 || 경험남음 >= 쿠폰최대ms - 1000) && styles.upgBtnOff, { alignSelf: 'flex-start', paddingHorizontal: 14 }]} onPress={() => 쿠폰구입('경험')}>
+                <Text style={styles.upgBtnText}>구입 (⭐1 / +1시간)</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.currencySection}>💰 재화 2배 쿠폰 (45~50강 판매 재화)</Text>
+              <Text style={{ color: 재화남음 > 0 ? '#7ed957' : '#888', fontSize: 11, marginBottom: 3 }}>남은 시간: {시간표시(재화남음)} · 1개 = ⭐50, +1시간 (최대 60시간)</Text>
+              <TouchableOpacity style={[styles.upgBtn, (ExPoint < 50 || 재화남음 >= 쿠폰최대ms - 1000) && styles.upgBtnOff, { alignSelf: 'flex-start', paddingHorizontal: 14 }]} onPress={() => 쿠폰구입('재화')}>
+                <Text style={styles.upgBtnText}>구입 (⭐50 / +1시간)</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )
+      })()}
 
       {도움말패널열림 && (
         <View style={styles.currencyPanel}>
@@ -3217,25 +3274,25 @@ export default function App() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !강화패널열림
-          set강화패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set자동패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+          set강화패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set명칭크리스탈패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>✨ 강화</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !명칭크리스탈패널열림
-          set명칭크리스탈패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set자동패널열림(false); set강화패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
+          set명칭크리스탈패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set강화패널열림(false); set고유유닛패널열림(false); set환생패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🌟 크리스탈</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !고유유닛패널열림
-          set고유유닛패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
+          set고유유닛패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🦸 고유</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.smallBtn, { backgroundColor: '#5b2a8c' }]} onPress={() => {
           const v = !환생패널열림
-          set환생패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+          set환생패널열림(v); if (v) { set재화패널열림(false); set도움말패널열림(false); set정보패널열림(false); set생산패널열림(false); set상점패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🌟 환생{환생레벨 > 0 ? `(Lv.${환생레벨})` : ''}</Text>
         </TouchableOpacity>
