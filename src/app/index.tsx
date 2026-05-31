@@ -2117,12 +2117,13 @@ export default function App() {
 
       // 자동 구입 (총 마린 상한 미만). 배수만큼 한 tick에 일괄 구입
       // 내부계산모드(렌더 OFF) 시 상한 대폭↑, 스프라이트 렌더 시엔 렉 방지 위해 낮게
-      const 최대유닛수 = 내부계산모드Ref.current ? 5000 : 1500
+      const 최대유닛수 = 5000
       const 총마린수예상 = currentMarines.length - 판매수집.length
       if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 최대유닛수) {
         const lv = 자동구입강도Ref.current
         const cost = 생산비용(lv)
-        const 배수 = 자동구입배수Ref.current + (보석Ref.current.촉진 || 0) + (일반스텟Ref.current.촉진 || 0) + (초월스텟Ref.current.촉진 || 0)  // 촉진(보석+일반+초월) 1당 자동생산 +1마리
+        const 단수촉진 = Math.floor(((고유유닛Ref.current.단수 || 1) - 1) / 10)  // 고유유닛 단수 10단마다 촉진 +1
+        const 배수 = 자동구입배수Ref.current + (보석Ref.current.촉진 || 0) + (일반스텟Ref.current.촉진 || 0) + (초월스텟Ref.current.촉진 || 0) + 단수촉진  // 촉진(보석+일반+초월+단수) 1당 자동생산 +1마리
         const 가용 = 잔여Mineral + 추가미네랄
         const 슬롯여유 = 최대유닛수 - 총마린수예상
         // 선형 구입: 1마리당 cost. 구입수 = min(배수, 슬롯여유, 살 수 있는 만큼). 비용 = cost × 구입수.
@@ -2713,7 +2714,7 @@ export default function App() {
   function 유닛구매(강도: number, 수량: number = 1) {
     const 단가 = 생산비용(강도)
     const 총마린수 = 마린들Ref.current.length
-    const 최대유닛수 = 내부계산모드Ref.current ? 5000 : 1500
+    const 최대유닛수 = 5000
     if (총마린수 >= 최대유닛수) { 메시지표시(`🚫 마린 가득참 (총 ${최대유닛수} 최대)`); return }
     const 여유 = 최대유닛수 - 총마린수
     const 가능자원 = Math.floor(mineralRef.current / 단가)
@@ -4127,7 +4128,7 @@ export default function App() {
             <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.min(10, v + 1))}>
               <Text style={styles.sliderArrowText}>▶</Text>
             </TouchableOpacity>
-            <Text style={{ color: '#aaa', fontSize: 10 }}>tick당 {자동구입배수 + (보석.촉진 || 0) + (일반스텟.촉진 || 0) + (초월스텟.촉진 || 0)}마리 (슬라이더 {자동구입배수} + 🚀보석 {보석.촉진 || 0} + 일반 {일반스텟.촉진 || 0} + 초월 {초월스텟.촉진 || 0})</Text>
+            <Text style={{ color: '#aaa', fontSize: 10 }}>tick당 {자동구입배수 + (보석.촉진 || 0) + (일반스텟.촉진 || 0) + (초월스텟.촉진 || 0) + Math.floor(((고유유닛.단수 || 1) - 1) / 10)}마리 (슬라이더 {자동구입배수} + 🚀보석 {보석.촉진 || 0} + 일반 {일반스텟.촉진 || 0} + 초월 {초월스텟.촉진 || 0} + 단수 {Math.floor(((고유유닛.단수 || 1) - 1) / 10)})</Text>
           </View>
         </View>
       )}
