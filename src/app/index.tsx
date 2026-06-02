@@ -61,9 +61,9 @@ const 강화확률표: number[] = [
 
 // 밸런스: 강화 난이도 밴드별 배율 (확률표에 곱). 낮출수록 그 구간 강화 느려짐 → 타임라인 튜닝 노브.
 // 목표 타임라인(컨트롤+방치): 26강 ~1일 / 26→41 ~1주 / 41→51 ~1주 / 51→60 ~1달
-const 강화배율_초반 = 0.74   // 1~25강 (DP역산: 무투자 26강 ≈ 20시간)
+const 강화배율_초반 = 0.73   // 1~25강 (DP역산: 무투자 26강 ≈ 1일)
 const 초반보너스캡 = 0.03    // 1~25강 강화확률 스텟/보석 합산 상한(+3%p). 풀투자 시 ~5배 빨라짐, 캡으로 폭주 방지
-const 강화배율_중반 = 0.90   // 26~39강 base-only (DP역산: 26→40 ≈ 5.5일, +40강관문 ≈ 1주)
+const 강화배율_중반 = 1.0    // 26~39강 (특수강화 제거 보상 — 밴드 도입 전 원래값으로 복원)
 function 강화기본확률(단계: number): number {
   const 배율 = 단계 <= 25 ? 강화배율_초반 : (단계 <= 39 ? 강화배율_중반 : 1)
   return (강화확률표[단계] ?? 0) * 배율
@@ -3030,7 +3030,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B10</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B11</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
