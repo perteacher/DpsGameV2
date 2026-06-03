@@ -3030,7 +3030,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B12</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B13</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
@@ -3092,7 +3092,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView style={{ maxHeight: 화면H - 420 }}>
+          <ScrollView style={{ maxHeight: 필드_H - 120 }}>
           <View style={styles.currencyGrid}>
             <Text style={[styles.currencyItem, { color: '#f5a623' }]}>📊 일반P {숫자포맷(잔여포인트)}</Text>
             <Text style={[styles.currencyItem, { color: '#a855f7' }]}>🌀 초월P {숫자포맷(초월잔여포인트)}</Text>
@@ -3127,7 +3127,7 @@ export default function App() {
               </TouchableOpacity>
             </View>
             <Text style={[styles.currencyItem, { color: '#a855f7' }]}>⭐ ExP {숫자포맷(ExPoint)}</Text>
-            <ScrollView style={{ maxHeight: 화면H - 360 }}>
+            <ScrollView style={{ maxHeight: 필드_H - 120 }}>
               <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1 : {숫자포맷(EXP_크레딧환율)})</Text>
               <View style={styles.currencyBtnRow}>
                 {([['25%', 0.25], ['50%', 0.5], ['전부', 1]] as const).map(([라벨, 비율]) => {
@@ -3179,7 +3179,7 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView style={{ maxHeight: 화면H - 320 }}>
+          <ScrollView style={{ maxHeight: 필드_H - 120 }}>
             {[
               ['🎯 목표', '마린을 강화해 고강(50강+)으로 키우고 DPS·자원·크레딧을 불린다.'],
               ['⚒️ 강화', '마린 선택 → 강화소 또는 자동강화. 성공 시 +1강(저강은 +2/+3도). 실패 시 마린 파괴(40~49강은 파괴방지 적용). 강화마다 자원(미네랄) 소모. 50→51강은 초월 시스템 별도.'],
@@ -3229,7 +3229,7 @@ export default function App() {
                   <TouchableOpacity onPress={() => 이동(1)} style={[styles.upgBtn, { minWidth: 44 }]}><Text style={styles.upgBtnText}>▶</Text></TouchableOpacity>
                   <TouchableOpacity onPress={() => 이동(10)} style={[styles.upgBtn, { minWidth: 44 }]}><Text style={styles.upgBtnText}>▶▶</Text></TouchableOpacity>
                 </View>
-                <ScrollView style={{ maxHeight: 화면H - 380 }}>
+                <ScrollView style={{ maxHeight: 필드_H - 120 }}>
                   <Text style={styles.currencySection}>🎲 강화 확률  <Text style={{ color: '#a855f7', fontSize: 11 }}>[{info.타입}]</Text></Text>
                   {info.확률.map((line, i) => (
                     <Text key={i} style={{ color: '#cfd6e4', fontSize: 14, lineHeight: 20 }}>{line}</Text>
@@ -3637,7 +3637,7 @@ export default function App() {
               <Text style={[styles.statTabText, 스텟탭 === '보석' && { color: '#000' }]}>💎 보석</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView style={{ maxHeight: 360 }}>
+          <ScrollView style={{ maxHeight: 필드_H - 120 }}>
             {/* 일반 스텟 — 메타 기반 (max/cost) */}
             {스텟탭 === '일반' && 일반스텟표.map(meta => {
               const val = 일반스텟[meta.key]
@@ -3877,7 +3877,7 @@ export default function App() {
                 </TouchableOpacity>
               ))}
             </View>
-            <ScrollView style={{ maxHeight: 300 }}>
+            <ScrollView style={{ maxHeight: 필드_H - 120 }}>
               {현재목록.map(info => {
                 const 현재수 = 명칭크리스탈[info.키] as number
                 const 장착됨 = 장착크리스탈.includes(info.키)
@@ -3974,7 +3974,7 @@ export default function App() {
               🌟 단수 {고유유닛.단수}단 · Lv3 단가 ×{단수배율(고유유닛.단수).toFixed(2)} · 채광력 +{고유유닛.단수 - 1}
               {단수업가능(고유유닛) ? ` · 다음 각성 💎×${단수업비용(고유유닛.단수)} (보유 ${각성의보석})` : ' · (모든 강화 MAX시 각성)'}
             </Text>
-            <ScrollView style={{ maxHeight: 320 }}>
+            <ScrollView style={{ maxHeight: 필드_H - 120 }}>
               {upgList.map(({ stat, 이모지, 설명, 상한 }) => {
                 const lv = 고유유닛[stat] as number
                 const maxed = lv >= 상한
@@ -4487,7 +4487,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#3a5a8a',
     zIndex: 250,
-    maxHeight: 화면H - 360,
+    maxHeight: 필드_H,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
@@ -4520,7 +4520,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#7ed957',
     zIndex: 100,
-    maxHeight: 화면H - 360,
+    maxHeight: 필드_H,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
