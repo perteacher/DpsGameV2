@@ -1248,6 +1248,7 @@ export default function App() {
   // 패널
   const [보주패널열림, set보주패널열림] = useState(false)
   const [강화패널열림, set강화패널열림] = useState(false)
+  const [필드상단Y, set필드상단Y] = useState(230)  // 필드 실제 상단 Y (onLayout 측정) → 패널 정렬 기준
   // 통계
   const [누적강화성공, set누적강화성공] = useState(0)
   const [누적판매, set누적판매] = useState(0)
@@ -3022,6 +3023,9 @@ export default function App() {
   // ============================================
   const now = Date.now()
 
+  // 패널을 필드 실제 위치/높이에 맞춰 가둠 (위·아래·좌·우 모두 필드 안쪽)
+  const 패널정렬 = { top: 필드상단Y + 4, maxHeight: 필드_H - 8 }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1a1a2e' }} edges={['top']}>
     <ScrollView
@@ -3030,7 +3034,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B13</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B14</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
@@ -3085,7 +3089,7 @@ export default function App() {
       </View>
 
       {재화패널열림 && (
-        <View style={styles.currencyPanel}>
+        <View style={[styles.currencyPanel, 패널정렬]}>
           <View style={styles.currencyHeader}>
             <Text style={styles.currencyTitle}>💰 재화</Text>
             <TouchableOpacity onPress={() => set재화패널열림(false)}>
@@ -3119,7 +3123,7 @@ export default function App() {
         const 재화남음 = Math.max(0, 재화쿠폰만료 - now)
         const 시간표시 = (ms: number) => ms <= 0 ? '비활성' : `${Math.floor(ms / 3600000)}시간 ${Math.floor((ms % 3600000) / 60000)}분`
         return (
-          <View style={styles.currencyPanel}>
+          <View style={[styles.currencyPanel, 패널정렬]}>
             <View style={styles.currencyHeader}>
               <Text style={styles.currencyTitle}>🛒 상점</Text>
               <TouchableOpacity onPress={() => set상점패널열림(false)}>
@@ -3172,7 +3176,7 @@ export default function App() {
       })()}
 
       {도움말패널열림 && (
-        <View style={styles.currencyPanel}>
+        <View style={[styles.currencyPanel, 패널정렬]}>
           <View style={styles.currencyHeader}>
             <Text style={styles.currencyTitle}>📖 게임 도움말</Text>
             <TouchableOpacity onPress={() => set도움말패널열림(false)}>
@@ -3210,7 +3214,7 @@ export default function App() {
       )}
 
       {정보패널열림 && (
-        <View style={styles.currencyPanel}>
+        <View style={[styles.currencyPanel, 패널정렬]}>
           <View style={styles.currencyHeader}>
             <Text style={styles.currencyTitle}>📊 강화 단계 정보</Text>
             <TouchableOpacity onPress={() => set정보패널열림(false)}>
@@ -3338,7 +3342,9 @@ export default function App() {
       </View>
 
       {/* 필드 (화면별 배경 이미지 + 단색 fallback + responder) */}
-      <View style={[styles.field, {
+      <View
+        onLayout={e => { const y = e.nativeEvent.layout.y; if (Math.abs(y - 필드상단Y) > 1) set필드상단Y(y) }}
+        style={[styles.field, {
         backgroundColor: 현재화면 === 'base' ? '#1a2a3e'
           : is사냥터(현재화면) ? '#1a3e2a'
           : '#3e1a2a',
@@ -3599,7 +3605,7 @@ export default function App() {
 
       {/* 영구강화 패널 */}
       {강화패널열림 && (
-        <View style={styles.prodPanel}>
+        <View style={[styles.prodPanel, 패널정렬]}>
           <View style={styles.prodHeader}>
             <Text style={styles.prodTitle}>✨ 영구강화</Text>
             <TouchableOpacity onPress={() => set강화패널열림(false)}>
@@ -3856,7 +3862,7 @@ export default function App() {
         const 슬롯수 = 크리스탈슬롯수(초월레벨)
         const 장착수 = 장착크리스탈.length
         return (
-          <View style={styles.prodPanel}>
+          <View style={[styles.prodPanel, 패널정렬]}>
             <View style={styles.prodHeader}>
               <Text style={styles.prodTitle}>🌟 크리스탈 (장착식)</Text>
               <TouchableOpacity onPress={() => set명칭크리스탈패널열림(false)}>
@@ -3956,7 +3962,7 @@ export default function App() {
           { stat: '파괴방지', 이모지: '🛡️', 설명: '파괴방지 +0.1%/강화',               상한: 200 },
         ]
         return (
-          <View style={styles.prodPanel}>
+          <View style={[styles.prodPanel, 패널정렬]}>
             <View style={styles.prodHeader}>
               <Text style={styles.prodTitle}>🦸 고유유닛 강화</Text>
               <TouchableOpacity onPress={() => set고유유닛패널열림(false)}>
@@ -4016,7 +4022,7 @@ export default function App() {
         const chk = 환생가능여부()
         const 보상 = 환생보상ExPoint()
         return (
-          <View style={styles.prodPanel}>
+          <View style={[styles.prodPanel, 패널정렬]}>
             <View style={styles.prodHeader}>
               <Text style={styles.prodTitle}>🌟 환생 (Lv.{환생레벨})</Text>
               <TouchableOpacity onPress={() => set환생패널열림(false)}>
@@ -4056,7 +4062,7 @@ export default function App() {
 
       {/* 자동화 패널 */}
       {자동패널열림 && (
-        <View style={styles.prodPanel}>
+        <View style={[styles.prodPanel, 패널정렬]}>
           <View style={styles.prodHeader}>
             <Text style={styles.prodTitle}>🤖 자동화</Text>
             <TouchableOpacity onPress={() => set자동패널열림(false)}>
