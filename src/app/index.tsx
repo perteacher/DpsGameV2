@@ -3030,7 +3030,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B11</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B12</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
@@ -4478,8 +4478,9 @@ const styles = StyleSheet.create({
   currencyPanel: {
     position: 'absolute',
     top: 260,
-    left: 8,
-    right: 8,
+    width: 필드_W,        // 게임 화면 폭에 맞춤 (창 전체로 안 퍼지게)
+    left: '50%',
+    marginLeft: -필드_W / 2,  // 가운데 정렬
     backgroundColor: '#16213e',
     padding: 10,
     borderRadius: 10,
@@ -4510,8 +4511,9 @@ const styles = StyleSheet.create({
   prodPanel: {
     position: 'absolute',
     top: 260,  // 탭/버튼바 아래로 내려서 버튼바와 안 겹치게
-    left: 8,
-    right: 8,
+    width: 필드_W,        // 게임 화면 폭에 맞춤 (창 전체로 안 퍼지게)
+    left: '50%',
+    marginLeft: -필드_W / 2,  // 가운데 정렬
     backgroundColor: '#16213e',
     padding: 12,
     borderRadius: 10,
