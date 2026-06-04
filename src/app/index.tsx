@@ -1385,17 +1385,26 @@ export default function App() {
     }
     else if (lv === 50) { 타입 = '초월 시도 (50→51)'; 확률 = [`성공 ${pct(0.005 + (ts.추가초월확률 || 0) * 0.00001 + 외부)}`] }
     else if (lv === 49) { 타입 = '고정 확률'; 확률 = ['성공 0.50%  (고정 — 외부보너스 미적용)'] }
-    else if (lv === 48) { 타입 = '개별 확률'; 확률 = [`성공 ${pct(s.가산48강 * 0.0005 + 외부)}  (기본 0%)`] }
+    else if (lv === 48) { 타입 = '개별 확률'; 확률 = [`성공 ${pct(s.가산48강 * 0.0005 + 외부 + _보석b_r.add48)}  (기본 0%)`] }
     else if (lv >= 44) {
       const base = 강화기본확률(lv)
       const g = [s.가산44강, s.가산45강, s.가산46강, s.가산47강][lv - 44] * 0.001
-      타입 = '개별 확률'; 확률 = [`성공 ${pct(base + g + 외부)}  (기본 ${(base * 100).toFixed(1)}%)`]
+      const gem = [_보석b_r.add44, _보석b_r.add45, _보석b_r.add46, _보석b_r.add47][lv - 44]
+      타입 = '개별 확률'; 확률 = [`성공 ${pct(base + g + gem + 외부)}  (기본 ${(base * 100).toFixed(1)}%)`]
     }
     else if (lv >= 40) { 타입 = '특수 확률'; 확률 = [`성공 ${pct(특수가산 + 외부)}  (특수강화 스텟 기반)`] }
     else if (lv >= 38) {
       const base = 강화기본확률(lv)
       const g = (s.가산1강 + s.가산1강2 + s.가산2강 + s.가산2강2 + s.가산3강 + s.가산3강2) * 0.001
       타입 = '일반 확률 (+1)'; 확률 = [`+1 ${pct(base * 1.11 + g + 외부 + 일반보)}`]
+    }
+    else if (lv <= 25) {
+      // 1~25강: base + (가산1강·보석·고유) 합산 상한캡. +2/+3은 base만
+      const base = 강화기본확률(lv)
+      const 보너스 = Math.min(초반보너스캡, (s.가산1강 + s.가산1강2) * 0.001 + 외부 + 일반보)
+      const p1 = base + 보너스
+      타입 = `일반 확률 (1~25: 보너스 캡 +${(초반보너스캡 * 100).toFixed(0)}%p)`
+      확률 = [`+1 ${pct(p1)}`, `+2 ${pct(base / 10)}`, `+3 ${pct(base / 100)}`]
     }
     else {
       const base = 강화기본확률(lv)
@@ -1430,8 +1439,8 @@ export default function App() {
       if (lv <= 37) { push('🦸 고유유닛(강화확률·일반전용)', 일반보); push('📊 스텟(가산1강)', (s.가산1강 + s.가산1강2) * 0.001) }
       else if (lv <= 39) { push('🦸 고유유닛(강화확률·일반전용)', 일반보); push('📊 스텟(가산1~3강)', (s.가산1강 + s.가산1강2 + s.가산2강 + s.가산2강2 + s.가산3강 + s.가산3강2) * 0.001) }
       else if (lv <= 43) push('⚡ 스텟(특수강화)', 특수가산)
-      else if (lv <= 47) push(`📊 스텟(가산${lv}강)`, [s.가산44강, s.가산45강, s.가산46강, s.가산47강][lv - 44] * 0.001)
-      else if (lv === 48) push('📊 스텟(가산48강)', s.가산48강 * 0.0005)
+      else if (lv <= 47) { push(`📊 스텟(가산${lv}강)`, [s.가산44강, s.가산45강, s.가산46강, s.가산47강][lv - 44] * 0.001); push('💎 보석(강화)', [_보석b_r.add44, _보석b_r.add45, _보석b_r.add46, _보석b_r.add47][lv - 44]) }
+      else if (lv === 48) { push('📊 스텟(가산48강)', s.가산48강 * 0.0005); push('💎 보석(강화)', _보석b_r.add48) }
       else if (lv >= 51) {
         let tb = 0
         if (lv === 51) tb = (ts.추가51강 || 0) * 0.001
@@ -3034,7 +3043,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B14</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B15</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
