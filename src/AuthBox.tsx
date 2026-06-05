@@ -12,18 +12,22 @@ import { auth, cloudLoadRaw, cloudSaveRaw, claimSession, watchSave } from './fir
 function newSession() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function 최고강(j: string | null): string { try { return j ? String(JSON.parse(j).최고마린lv ?? '?') : '-' } catch { return '?' } }
 function 저장시각(j: string | null): number { try { return j ? (JSON.parse(j).마지막저장시간 || 0) : 0 } catch { return 0 } }
-// 폭주 차단: 한 탭 세션에서 새로고침 8회 넘으면 멈춤(무한루프 방지). 안정 상태 도달 시 clearReloadGuard로 리셋.
+// 폭주 차단: 최근 10초에 새로고침 3회 이상이면 '루프'로 보고 차단. 평소(가끔) 새로고침은 허용.
 function safeReload() {
   if (Platform.OS !== 'web') return
   try {
     const ss = (window as any).sessionStorage
-    const n = (parseInt(ss?.getItem('dps_reload_n') || '0', 10) || 0) + 1
-    if (n > 8) return
-    ss?.setItem('dps_reload_n', String(n))
+    const now = Date.now()
+    let arr: number[] = []
+    try { arr = JSON.parse(ss?.getItem('dps_reload_ts') || '[]') } catch {}
+    arr = arr.filter((t: number) => now - t < 10000)
+    if (arr.length >= 3) return  // 10초 내 3회 = 루프 → 차단
+    arr.push(now)
+    ss?.setItem('dps_reload_ts', JSON.stringify(arr))
   } catch {}
   ;(window as any).location.reload()
 }
-function clearReloadGuard() { try { (window as any).sessionStorage?.setItem('dps_reload_n', '0') } catch {} }
+function clearReloadGuard() { try { (window as any).sessionStorage?.setItem('dps_reload_ts', '[]') } catch {} }
 
 type 충돌타입 = { cloudJson: string; cloudVer: number; cloud최고: string; local최고: string } | null
 
