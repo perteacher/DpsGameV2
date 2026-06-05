@@ -2211,7 +2211,7 @@ export default function App() {
         const 단수촉진 = Math.floor(((고유유닛Ref.current.단수 || 1) - 1) / 10)  // 고유유닛 단수 10단마다 촉진 +1
         const 틱촉진합 = (보석Ref.current.촉진 || 0) + (일반스텟Ref.current.촉진 || 0) + (초월스텟Ref.current.촉진 || 0) + 단수촉진
         const 틱최대 = 10 + 틱촉진합  // 촉진이 선택 가능한 최대치를 올림(강제 하한 X)
-        const 배수 = Math.min(Math.max(1, 자동구입배수Ref.current), 틱최대)  // 슬라이더로 1~최대 자유 선택
+        const 배수 = 틱최대  // 항상 최대 적용 (수동 조절 제거)
         const 가용 = 잔여Mineral + 추가미네랄
         const 슬롯여유 = 최대유닛수 - 총마린수예상
         // 선형 구입: 1마리당 cost. 구입수 = min(배수, 슬롯여유, 살 수 있는 만큼). 비용 = cost × 구입수.
@@ -3148,7 +3148,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C9</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C10</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
@@ -4300,18 +4300,7 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {/* 자동 구입 틱당 마린수 (1 ~ 최대틱수). 촉진이 최대치를 올림 */}
-          <View style={styles.sliderRow}>
-            <Text style={styles.sliderLabel}>📦 틱당</Text>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.max(1, v - 1))}>
-              <Text style={styles.sliderArrowText}>◀</Text>
-            </TouchableOpacity>
-            <Text style={styles.sliderValue}>{Math.min(자동구입배수, 최대틱수)}</Text>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.min(최대틱수, v + 1))}>
-              <Text style={styles.sliderArrowText}>▶</Text>
-            </TouchableOpacity>
-            <Text style={{ color: '#aaa', fontSize: 10 }}>마리 / tick (최대 {최대틱수} = 기본10 + 🚀촉진 {촉진합})</Text>
-          </View>
+          <Text style={{ color: '#7ed957', fontSize: 12 }}>⚡ 촉진 틱: 최대 자동 적용 ({최대틱수}/틱)</Text>
         </View>
       )}
 
