@@ -16,34 +16,34 @@ const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
 
-export type 세이브문서 = { json?: string; 마지막저장시간?: number; session?: string; updated?: number }
+export type 세이브문서 = { json?: string; 마지막저장시간?: number; session?: string; version?: number; updated?: number }
 
-// 세이브 문서: saves/{uid}
-export async function cloudLoadRaw(uid: string): Promise<{ json: string; 마지막저장시간: number; session: string } | null> {
+// 세이브 로드 — version(증가 카운터)로 최신 판별
+export async function cloudLoadRaw(uid: string): Promise<{ json: string; version: number; session: string } | null> {
   const snap = await getDoc(doc(db, 'saves', uid))
   if (!snap.exists()) return null
   const d = snap.data() as 세이브문서
   if (typeof d.json !== 'string') return null
   return {
     json: d.json,
-    마지막저장시간: typeof d.마지막저장시간 === 'number' ? d.마지막저장시간 : 0,
+    version: typeof d.version === 'number' ? d.version : 0,
     session: typeof d.session === 'string' ? d.session : '',
   }
 }
 
-// 세이브 저장 (merge: session 필드 유지)
-export async function cloudSaveRaw(uid: string, json: string): Promise<void> {
+// 세이브 저장 (version 함께 기록; merge로 session 유지)
+export async function cloudSaveRaw(uid: string, json: string, version: number): Promise<void> {
   let 마지막저장시간 = 0
   try { 마지막저장시간 = JSON.parse(json).마지막저장시간 || 0 } catch {}
-  await setDoc(doc(db, 'saves', uid), { json, 마지막저장시간, updated: Date.now() }, { merge: true })
+  await setDoc(doc(db, 'saves', uid), { json, version, 마지막저장시간, updated: Date.now() }, { merge: true })
 }
 
-// 현재 활성 세션 ID 등록 (단일 세션 — 새 기기 로그인 시 이 값이 바뀜)
+// 활성 세션 ID 등록 (단일 세션 — kick용)
 export async function claimSession(uid: string, sessionId: string): Promise<void> {
   await setDoc(doc(db, 'saves', uid), { session: sessionId }, { merge: true })
 }
 
-// 세이브 문서 실시간 감시 (세션 변경·최신시간 추적용)
+// 실시간 감시 (세션 변경 = 다른 기기 로그인 → kick)
 export function watchSave(uid: string, cb: (d: 세이브문서 | null) => void): () => void {
   return onSnapshot(doc(db, 'saves', uid), snap => cb(snap.exists() ? (snap.data() as 세이브문서) : null))
 }

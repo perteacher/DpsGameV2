@@ -1,8 +1,6 @@
 // 로그인 게이트 + 클라우드 세이브 동기화 + 단일 세션
-// - 로그인해야만 플레이 가능 (전체화면 게이트)
-// - 같은 계정 새 기기 로그인 시 기존 기기 강제 종료 (세션ID 실시간 감시)
-// - 동기화는 '세션 소유권' 기준 (시각 비교는 항상-최신 로컬 때문에 불가)
-// - 클라우드 채택 시 '즉시' 새로고침 (지연 주면 게임 자동저장이 덮어써서 동기화 깨짐)
+// 동기화 판별 = '세이브 version(증가 카운터)' 기준. 데이터와 함께 다녀서 확실함.
+// (세션ID는 다른 기기 로그인 감지=강제종료(kick) 전용)
 import React, { useEffect, useRef, useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Platform, Modal } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -12,8 +10,8 @@ import {
 } from 'firebase/auth'
 import { auth, cloudLoadRaw, cloudSaveRaw, claimSession, watchSave } from './firebase'
 
-const 저장주기ms = 120000  // 2분마다 클라우드 업로드 (Firebase 비용 절감)
 function newSession() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
+function 최고강(j: string | null): string { try { return j ? String(JSON.parse(j).최고마린lv ?? '?') : '-' } catch { return '?' } }
 
 export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAuth?: (loggedIn: boolean) => void }) {
   const [user, setUser] = useState<User | null>(null)
@@ -27,14 +25,16 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
 
   const sessionRef = useRef('')
   const lastPushRef = useRef('')
+  const myVerRef = useRef(0)              // 이 기기가 가진 데이터 버전
+  const 읽기성공Ref = useRef(false)        // 클라우드 읽기 성공해야만 업로드 허용
   const unsubRef = useRef<null | (() => void)>(null)
-  const 읽기성공Ref = useRef(false)  // 클라우드 읽기 성공해야만 업로드 허용 (실패 시 덮어쓰기 방지)
+
+  const verKey = 저장키 + '_ver'
+  const sessKey = 저장키 + '_sess'
 
   useEffect(() => {
     const off = onAuthStateChanged(auth, u => {
-      set초기로딩(false)
-      setUser(u)
-      onAuth?.(!!u)  // 게임 정지/재개 신호
+      set초기로딩(false); setUser(u); onAuth?.(!!u)
       if (u) onLogin(u.uid)
       else if (unsubRef.current) { unsubRef.current(); unsubRef.current = null }
     })
@@ -42,44 +42,46 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
   }, [])
 
   async function onLogin(uid: string) {
-    setKicked(''); set동기화중(true)
-    읽기성공Ref.current = false
-    let local: string | null = null, mySess: string | null = null
+    setKicked(''); set동기화중(true); 읽기성공Ref.current = false
+    let local: string | null = null, myVerStr: string | null = null
     let cloud: Awaited<ReturnType<typeof cloudLoadRaw>> = null
     try {
       local = await AsyncStorage.getItem(저장키)
-      mySess = await AsyncStorage.getItem(저장키 + '_sess')
+      myVerStr = await AsyncStorage.getItem(verKey)
       cloud = await cloudLoadRaw(uid)
     } catch (e: any) {
-      // 읽기 실패 → 업로드 차단(태블릿 데이터 보호) + 에러 표시
-      setMsg('❌ 클라우드 읽기 실패: ' + (e?.code || e?.message || e) + ' — 업로드 차단됨')
+      setMsg('❌ 클라우드 읽기 실패: ' + (e?.code || e?.message || e) + ' — 업로드 차단')
       set동기화중(false); return
     }
     읽기성공Ref.current = true
-    // 진단: 클라우드/로컬 상태
-    const _lv = (j: string | null) => { try { return j ? (JSON.parse(j).최고마린lv ?? '?') : '-' } catch { return '?' } }
-    const 진단 = `클라우드:${cloud ? `있음(최고${_lv(cloud.json)}강,${cloud.json.length}자)` : '없음'} / 로컬:${local ? `최고${_lv(local)}강` : '없음'}`
+    const myVer = parseInt(myVerStr || '0', 10) || 0
+    const cloudVer = cloud?.version || 0
+    myVerRef.current = myVer
+    const 진단 = `클라우드:${cloud ? `v${cloudVer}·최고${최고강(cloud.json)}강` : '없음'} / 로컬:v${myVer}·최고${최고강(local)}강`
 
-    // 세션 점유 + 영속 먼저 (루프 방지 + 채택 후 즉시 reload 가능)
+    // 세션 점유(kick용) + 영속
     const sid = newSession(); sessionRef.current = sid
-    try { await claimSession(uid, sid); await AsyncStorage.setItem(저장키 + '_sess', sid) } catch {}
+    try { await claimSession(uid, sid); await AsyncStorage.setItem(sessKey, sid) } catch {}
 
-    // 클라우드를 마지막에 쓴 게 '다른 기기'면 채택
-    const adopt = !!cloud && !(cloud.session && mySess && cloud.session === mySess)
-    if (cloud && adopt) {
-      try { await AsyncStorage.setItem(저장키, cloud.json) } catch {}
-      lastPushRef.current = cloud.json
+    if (cloud && cloudVer > myVer) {
+      // 클라우드가 더 최신 버전 → 채택 + 즉시 새로고침
+      try { await AsyncStorage.setItem(저장키, cloud.json); await AsyncStorage.setItem(verKey, String(cloudVer)) } catch {}
+      lastPushRef.current = cloud.json; myVerRef.current = cloudVer
       setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
-      // ★ 즉시 새로고침 (지연 주면 옛 자동저장이 덮어씀)
       if (Platform.OS === 'web') { (window as any).location.reload() }
       return
     }
 
-    // 내 기기가 최신(또는 클라우드 없음) → 로컬 업로드
-    if (local) { try { await cloudSaveRaw(uid, local) } catch {} ; lastPushRef.current = local }
-    setMsg((cloud ? '☁️ 동기화됨(내기기 최신) — ' : '☁️ 업로드됨(클라우드 없었음) — ') + 진단); set동기화중(false)
+    // 내 로컬이 최신(또는 동일/클라우드 없음) → 업로드 (버전 +1)
+    if (local) {
+      const newVer = Math.max(cloudVer, myVer) + 1
+      try { await cloudSaveRaw(uid, local, newVer); await AsyncStorage.setItem(verKey, String(newVer)) } catch {}
+      lastPushRef.current = local; myVerRef.current = newVer
+      setMsg(`☁️ 업로드됨(v${newVer}) — ` + 진단)
+    } else setMsg('로그인됨 — ' + 진단)
+    set동기화중(false)
 
-    // 실시간 감시 (다른 기기 로그인 시 종료)
+    // 실시간 감시 (다른 기기 로그인 = 세션 변경 → 종료)
     if (unsubRef.current) unsubRef.current()
     unsubRef.current = watchSave(uid, d => {
       if (!d) return
@@ -94,17 +96,20 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
   // 2분마다 로컬 변경분 업로드
   useEffect(() => {
     if (!user) return
-    const id = setInterval(() => 업로드(user.uid), 저장주기ms)
+    const id = setInterval(() => 업로드(user.uid), 120000)
     return () => clearInterval(id)
   }, [user])
 
   async function 업로드(uid: string, 강제 = false) {
-    if (!읽기성공Ref.current) { if (강제) setMsg('⚠️ 동기화 미완료 상태 — 업로드 차단(데이터 보호)'); return }
+    if (!읽기성공Ref.current) { if (강제) setMsg('⚠️ 동기화 미완료 — 업로드 차단(데이터 보호)'); return }
     try {
       const local = await AsyncStorage.getItem(저장키)
       if (local && (강제 || local !== lastPushRef.current)) {
-        await cloudSaveRaw(uid, local); lastPushRef.current = local
-        if (강제) setMsg('☁️ 동기화 완료 ' + new Date().toLocaleTimeString())
+        const newVer = (myVerRef.current || 0) + 1
+        await cloudSaveRaw(uid, local, newVer)
+        await AsyncStorage.setItem(verKey, String(newVer))
+        myVerRef.current = newVer; lastPushRef.current = local
+        if (강제) setMsg(`☁️ 동기화 완료 v${newVer} ` + new Date().toLocaleTimeString())
       } else if (강제) setMsg('변경사항 없음')
     } catch (e: any) { if (강제) setMsg('업로드 오류: ' + (e?.message || e)) }
   }
@@ -122,8 +127,10 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
   }
   async function 로그아웃() {
     try {
-      const local = await AsyncStorage.getItem(저장키)
-      if (user && local) await cloudSaveRaw(user.uid, local)
+      if (user && 읽기성공Ref.current) {
+        const local = await AsyncStorage.getItem(저장키)
+        if (local) { const v = (myVerRef.current || 0) + 1; await cloudSaveRaw(user.uid, local, v); await AsyncStorage.setItem(verKey, String(v)) }
+      }
     } catch {}
     if (unsubRef.current) { unsubRef.current(); unsubRef.current = null }
     await signOut(auth); setPw(''); set열림(false)
@@ -166,7 +173,7 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
             <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>👤 {user.email?.split('@')[0] || '계정'}</Text>
           </TouchableOpacity>
           {열림 && (
-            <View style={{ position: 'absolute', top: 28, right: 0, width: 230, backgroundColor: '#16213e', borderWidth: 2, borderColor: '#5a3a8a', borderRadius: 8, padding: 10, zIndex: 999, gap: 6 }}>
+            <View style={{ position: 'absolute', top: 28, right: 0, width: 240, backgroundColor: '#16213e', borderWidth: 2, borderColor: '#5a3a8a', borderRadius: 8, padding: 10, zIndex: 999, gap: 6 }}>
               <Text style={{ color: '#7ed957', fontSize: 12, fontWeight: 'bold' }}>☁️ {user.email}</Text>
               <Text style={{ color: '#aaa', fontSize: 10 }}>2분마다 자동 동기화 · 1기기만 접속</Text>
               <TouchableOpacity onPress={() => 업로드(user.uid, true)} style={btn('#3a5a8a')}><Text style={bt}>지금 동기화(업로드)</Text></TouchableOpacity>
