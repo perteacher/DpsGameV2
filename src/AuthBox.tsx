@@ -12,6 +12,17 @@ import { auth, cloudLoadRaw, cloudSaveRaw, claimSession, watchSave } from './fir
 function newSession() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function 최고강(j: string | null): string { try { return j ? String(JSON.parse(j).최고마린lv ?? '?') : '-' } catch { return '?' } }
 function 저장시각(j: string | null): number { try { return j ? (JSON.parse(j).마지막저장시간 || 0) : 0 } catch { return 0 } }
+// 무한 새로고침 방지: 같은 세션에서 8초 내 재새로고침 차단
+function safeReload() {
+  if (Platform.OS !== 'web') return
+  try {
+    const ss = (window as any).sessionStorage
+    const last = parseInt(ss?.getItem('dps_reload_at') || '0', 10) || 0
+    if (Date.now() - last < 8000) return
+    ss?.setItem('dps_reload_at', String(Date.now()))
+  } catch {}
+  ;(window as any).location.reload()
+}
 
 type 충돌타입 = { cloudJson: string; cloudVer: number; cloud최고: string; local최고: string } | null
 
@@ -35,6 +46,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
 
   const verKey = 저장키 + '_ver'
   const sessKey = 저장키 + '_sess'
+  const uidKey = 저장키 + '_uid'   // 이 기기 로컬 세이브가 어떤 계정 것인지
 
   useEffect(() => {
     const off = onAuthStateChanged(auth, u => {
@@ -60,11 +72,12 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
 
   async function onLogin(uid: string) {
     setKicked(''); set동기화중(true); set충돌(null); 읽기성공Ref.current = false
-    let local: string | null = null, myVerStr: string | null = null
+    let local: string | null = null, myVerStr: string | null = null, localUid: string | null = null
     let cloud: Awaited<ReturnType<typeof cloudLoadRaw>> = null
     try {
       local = await AsyncStorage.getItem(저장키)
       myVerStr = await AsyncStorage.getItem(verKey)
+      localUid = await AsyncStorage.getItem(uidKey)
       cloud = await cloudLoadRaw(uid)
     } catch (e: any) {
       setMsg('❌ 클라우드 읽기 실패: ' + (e?.code || e?.message || e) + ' — 업로드 차단')
@@ -74,6 +87,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     const myVer = parseInt(myVerStr || '0', 10) || 0
     const cloudVer = cloud?.version || 0
     myVerRef.current = myVer; cloudVerRef.current = cloudVer
+    const 다른계정로컬 = !!(local && localUid && localUid !== uid)  // 이 기기 로컬이 다른 계정 것
     const 진단 = `클라우드:${cloud ? `v${cloudVer}·최고${최고강(cloud.json)}강` : '없음'} / 로컬:v${myVer}·최고${최고강(local)}강`
 
     // 세션 점유(kick용) + 영속 + 감시
@@ -82,32 +96,54 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     startWatch(uid)
 
     if (!cloud || !cloud.json) {
-      // 클라우드 없음 → 로컬 업로드
-      if (local) await pushLocal(uid, local)
-      else setMsg('로그인됨 — ' + 진단)
+      // 클라우드 없음
+      if (local && localUid === uid) {
+        // 같은 계정인데 클라우드가 비어있음(삭제 등) → 로컬로 복구 업로드
+        await pushLocal(uid, local)
+        try { await AsyncStorage.setItem(uidKey, uid) } catch {}
+        setMsg('로그인됨(복구) — ' + 진단)
+      } else if (local) {
+        // 새 계정(클라우드 없음) — 이 기기의 다른/이전 계정 데이터를 물려받지 않고 새로 시작
+        try {
+          await AsyncStorage.removeItem(저장키)
+          await AsyncStorage.setItem(verKey, '0')
+          await AsyncStorage.setItem(uidKey, uid)
+        } catch {}
+        myVerRef.current = 0; cloudVerRef.current = 0; lastPushRef.current = ''
+        setMsg('🆕 새 계정 — 새로 시작'); set동기화중(false)
+        safeReload(); return
+      } else {
+        // 로컬도 없음 → 완전 신규
+        try { await AsyncStorage.setItem(uidKey, uid) } catch {}
+        setMsg('로그인됨 — ' + 진단)
+      }
       set동기화중(false); return
     }
+
+    // 클라우드 있음 → 이 기기를 이 계정에 바인딩
+    try { await AsyncStorage.setItem(uidKey, uid) } catch {}
+
     if (!local || cloud.json === local) {
       // 로컬 없거나 클라우드와 동일 → 버전만 맞춤
       if (!local) { try { await AsyncStorage.setItem(저장키, cloud.json) } catch {} }
       const v = Math.max(cloudVer, myVer)
       await AsyncStorage.setItem(verKey, String(v)); myVerRef.current = v; lastPushRef.current = cloud.json
       setMsg('☁️ 동기화됨 — ' + 진단); set동기화중(false)
-      if (!local && Platform.OS === 'web') (window as any).location.reload()
+      if (!local) safeReload()
       return
     }
-    // 로컬·클라우드 둘 다 데이터 있고 다름 → 버전 무시, 진행도(최고강) 우선; 동률이면 최근 저장 우선
+    // 로컬·클라우드 둘 다 데이터 있고 다름 → 진행도(최고강) 우선, 동률이면 최근 저장; 다른계정 로컬이면 무조건 클라우드 채택
     const c최고 = parseInt(최고강(cloud.json)) || 0
     const l최고 = parseInt(최고강(local)) || 0
-    const 클라우드채택 = (c최고 !== l최고) ? (c최고 > l최고) : (저장시각(cloud.json) > 저장시각(local))
+    const 클라우드채택 = 다른계정로컬 ? true
+      : (c최고 !== l최고) ? (c최고 > l최고) : (저장시각(cloud.json) > 저장시각(local))
     const v = Math.max(cloudVer, myVer)
     if (클라우드채택) {
-      // 클라우드가 더 진행됨(or 더 최근) → 자동 불러오기 + 새로고침 (기기전환)
+      // 클라우드가 더 진행됨(or 더 최근, or 다른계정) → 자동 불러오기 + 새로고침
       try { await AsyncStorage.setItem(저장키, cloud.json); await AsyncStorage.setItem(verKey, String(v)) } catch {}
       lastPushRef.current = cloud.json; myVerRef.current = v; cloudVerRef.current = v
       setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
-      if (Platform.OS === 'web') (window as any).location.reload()
-      return
+      safeReload(); return
     }
     // 로컬이 더 진행됨(or 더 최근, or 동일) → 업로드
     await pushLocal(uid, local)
@@ -149,8 +185,9 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     const c = 충돌; if (!c) return
     try { await AsyncStorage.setItem(저장키, c.cloudJson); await AsyncStorage.setItem(verKey, String(c.cloudVer)) } catch {}
     lastPushRef.current = c.cloudJson; myVerRef.current = c.cloudVer
+    try { await AsyncStorage.setItem(uidKey, user?.uid || '') } catch {}
     set충돌(null)
-    if (Platform.OS === 'web') (window as any).location.reload()
+    safeReload()
   }
   async function 충돌_내기기사용() {
     const c = 충돌; if (!c || !user) return
