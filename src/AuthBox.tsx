@@ -97,7 +97,17 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     }
     // 로컬·클라우드 둘 다 데이터 있고 다름
     if (cloudVer > myVer) {
-      // 클라우드가 더 최신 버전 → 충돌: 자동 덮어쓰기 금지, 사용자 선택
+      const c최고 = parseInt(최고강(cloud.json)) || 0
+      const l최고 = parseInt(최고강(local)) || 0
+      if (c최고 >= l최고) {
+        // 클라우드 진행도가 같거나 많음 → 자동 불러오기 + 새로고침 (일반 기기전환)
+        try { await AsyncStorage.setItem(저장키, cloud.json); await AsyncStorage.setItem(verKey, String(cloudVer)) } catch {}
+        lastPushRef.current = cloud.json; myVerRef.current = cloudVer
+        setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
+        if (Platform.OS === 'web') (window as any).location.reload()
+        return
+      }
+      // 클라우드 버전 높은데 진행도 적음(덮어쓰기 의심) → 충돌 선택
       set충돌({ cloudJson: cloud.json, cloudVer, cloud최고: 최고강(cloud.json), local최고: 최고강(local) })
       setMsg('⚠️ 세이브 충돌 — 선택 필요'); set동기화중(false)
       return
