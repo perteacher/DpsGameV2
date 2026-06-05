@@ -672,7 +672,7 @@ const 필드_W = _isWeb ? 460 : Math.min(380, 화면W - 16)
 const 필드_H = _isWeb
   ? Math.max(380, Math.min(560, 화면H - 220))
   : Math.max(280, Math.min(440, 화면H - 400))
-const 최대표시유닛 = 400  // 화면에 동시에 그리는 스프라이트 상한 (렉 방지; 시뮬레이션은 전체 적용)
+const 최대표시유닛 = 150  // 화면에 동시에 그리는 스프라이트 상한 (렉 방지; 시뮬레이션은 전체 적용)
 const 마린_크기 = 34
 const 적_크기 = 42      // 일반 적 (보스/몹용 별도)
 const 몹_크기 = 90       // 사냥터 몹 (크게)
@@ -3148,7 +3148,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C8</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C9</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
