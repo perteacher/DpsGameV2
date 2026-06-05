@@ -3136,7 +3136,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C5</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C6</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
@@ -4009,6 +4009,11 @@ export default function App() {
             </Text>
             <Text style={[styles.prodSubtitle, { fontSize: 10, color: '#888' }]}>
               크리스탈 획득: 51강+ 판매시 박스 드랍 / 타격수 보상 (탭=장착 토글)
+            </Text>
+            {/* 보유 조각 (제작 재료) — 갤럭시 이하=크리스탈조각, 퀘이사=상급크리스탈조각 */}
+            <Text style={[styles.prodSubtitle, { fontSize: 12, color: '#cfd6e4' }]}>
+              🔮 크리스탈조각 {숫자포맷(크리스탈조각)}  ·  🟣 상급조각 {숫자포맷(상급크리스탈조각)}
+              <Text style={{ color: '#888', fontSize: 10 }}>{명칭크리스탈탭 === '퀘이사' ? '  (이 탭 제작=상급조각)' : '  (이 탭 제작=크리스탈조각)'}</Text>
             </Text>
             {/* 탭 */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6, gap: 4 }}>
