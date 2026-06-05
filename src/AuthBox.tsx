@@ -132,14 +132,20 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
       if (!local) safeReload()
       return
     }
-    // 로컬·클라우드 둘 다 데이터 있고 다름 → 진행도(최고강) 우선, 동률이면 최근 저장; 다른계정 로컬이면 무조건 클라우드 채택
+    // 로컬·클라우드 둘 다 데이터 있고 다름
     const c최고 = parseInt(최고강(cloud.json)) || 0
     const l최고 = parseInt(최고강(local)) || 0
-    const 클라우드채택 = 다른계정로컬 ? true
-      : (c최고 !== l최고) ? (c최고 > l최고) : (저장시각(cloud.json) > 저장시각(local))
     const v = Math.max(cloudVer, myVer)
+    if (다른계정로컬) {
+      // 이 기기 로컬이 '다른 계정' 것 → 자동 판단 금지(잘못 덮을 위험) → 사용자가 선택
+      set충돌({ cloudJson: cloud.json, cloudVer, cloud최고: 최고강(cloud.json), local최고: 최고강(local) })
+      setMsg('⚠️ 다른 계정 데이터 감지 — 선택 필요'); set동기화중(false)
+      return
+    }
+    // 같은 계정 다기기 → 진행도(최고강) 우선, 동률이면 최근 저장 우선
+    const 클라우드채택 = (c최고 !== l최고) ? (c최고 > l최고) : (저장시각(cloud.json) > 저장시각(local))
     if (클라우드채택) {
-      // 클라우드가 더 진행됨(or 더 최근, or 다른계정) → 자동 불러오기 + 새로고침
+      // 클라우드가 더 진행됨(or 더 최근) → 자동 불러오기 + 새로고침
       try { await AsyncStorage.setItem(저장키, cloud.json); await AsyncStorage.setItem(verKey, String(v)) } catch {}
       lastPushRef.current = cloud.json; myVerRef.current = v; cloudVerRef.current = v
       setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
@@ -194,6 +200,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     try {
       const local = await AsyncStorage.getItem(저장키)
       if (local) { const v = await pushLocal(user.uid, local); setMsg(`⬆️ 이 기기 데이터로 클라우드 덮음 (v${v})`) }
+      await AsyncStorage.setItem(uidKey, user.uid)
     } catch {}
     set충돌(null)
   }
@@ -253,8 +260,8 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
       <Modal visible={!!충돌} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(10,12,22,0.94)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <View style={{ width: 320, maxWidth: '100%', backgroundColor: '#16213e', borderWidth: 2, borderColor: '#e94560', borderRadius: 12, padding: 18, gap: 10 }}>
-            <Text style={{ color: '#ff9a9a', fontSize: 16, fontWeight: 'bold', textAlign: 'center' }}>⚠️ 세이브 충돌</Text>
-            <Text style={{ color: '#cfd6e4', fontSize: 12, textAlign: 'center' }}>두 기기 데이터가 달라요. 쓸 데이터를 고르세요.{'\n'}(선택 안 한 쪽은 덮어써집니다)</Text>
+            <Text style={{ color: '#ff9a9a', fontSize: 16, fontWeight: 'bold', textAlign: 'center' }}>⚠️ 세이브 선택</Text>
+            <Text style={{ color: '#cfd6e4', fontSize: 12, textAlign: 'center' }}>이 계정의 클라우드 저장과 이 기기 데이터가 달라요.{'\n'}쓸 데이터를 고르세요 (선택 안 한 쪽은 덮어써짐)</Text>
             <TouchableOpacity onPress={충돌_클라우드사용} style={btn('#3a5a8a')}>
               <Text style={bt}>☁️ 클라우드 사용 (최고{충돌?.cloud최고}강)</Text>
             </TouchableOpacity>
