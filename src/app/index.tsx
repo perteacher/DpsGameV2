@@ -2662,6 +2662,15 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
+  function ExP를크레딧으로(비율: number) {
+    const 변환ExP = Math.floor(ExPointRef.current * 비율)
+    if (변환ExP < 1) { 메시지표시('⭐ 변환할 ExP가 부족합니다'); return }
+    const 획득크레딧 = 변환ExP * EXP_크레딧환율
+    setExPoint(p => p - 변환ExP)
+    set크레딧(p => p + 획득크레딧)
+    메시지표시(`⭐${숫자포맷(변환ExP)} → 💰${숫자포맷(획득크레딧)} 크레딧`)
+  }
+
   // ExP 뽑기: 1뽑기당 EXP_뽑기비용 ExP. 기본 무색조각 50 + 확률 추가지급. 배수(횟수) 지원.
   const EXP_뽑기비용 = 1
   function ExP뽑기(횟수: number) {
@@ -3094,6 +3103,26 @@ export default function App() {
 
   const now = Date.now()
 
+  // 현재 강화에 적용 중인 추가 보너스 전체 (계정 패널 표시용)
+  const 강화보너스요약: string[] = (() => {
+    const s = 일반스텟, b = _보석b_r, mb = _명칭보너스r
+    const pct = (v: number) => (v * 100).toFixed(2) + '%'
+    const 파괴방지pt = (s.특수파괴방지 || 0) + (s.특수파괴방지2 || 0) + mb.파괴방지 + b.파괴방지 + (고유유닛.파괴방지 || 0)
+    return [
+      `⚔️ 보주(강화확률): +${pct(보주합산(보주, '강화'))}`,
+      `🔧 영구강화(강화확률): +${pct(업그레이드.강화확률 * 0.005)}`,
+      `🏅 명칭크리스탈(개별): +${pct(mb.개별확률)}`,
+      `💎 보석 궁극(1~47강): +${pct(b.궁극보너스)}`,
+      `📊 스텟 가산1강: +${pct((s.가산1강 + s.가산1강2) * 0.001)}`,
+      `📊 스텟 가산2강: +${pct((s.가산2강 + s.가산2강2) * 0.001)}`,
+      `📊 스텟 가산3강: +${pct((s.가산3강 + s.가산3강2) * 0.001)}`,
+      `⚡ 스텟 특수강화(40~43강): +${pct((s.특수강화 + s.특수강화2) * 0.001)}`,
+      `🦸 고유유닛(일반확률): +${pct(고유유닛.추가1강 * 0.0025 + 고유유닛.특수강화 * 0.005)}`,
+      `🛡️ 파괴방지(6~49강): ${파괴방지pt}pt → ${pct(Math.min(0.95, 파괴방지pt * 0.001))}`,
+      `🌟 보석 44~48강: +${pct(b.add44)} / ${pct(b.add45)} / ${pct(b.add46)} / ${pct(b.add47)} / ${pct(b.add48)}`,
+    ]
+  })()
+
   // 패널을 필드 실제 위치/높이에 맞춰 가둠 (위·아래·좌·우 모두 필드 안쪽)
   const 패널정렬 = { top: 필드상단Y + 4, maxHeight: 필드_H - 8 }
 
@@ -3107,7 +3136,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build c2</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C4</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
@@ -3158,7 +3187,7 @@ export default function App() {
           })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#8a5a2a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>🛒 상점</Text>
           </TouchableOpacity>
-          <AuthBox 저장키={저장키} onAuth={set로그인됨} />
+          <AuthBox 저장키={저장키} onAuth={set로그인됨} 보너스요약={강화보너스요약} />
         </View>
       </View>
 
@@ -3221,6 +3250,18 @@ export default function App() {
                     </>
                   )
                 })()}
+              </View>
+              <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1 : {숫자포맷(EXP_크레딧환율)})</Text>
+              <View style={styles.currencyBtnRow}>
+                {([['25%', 0.25], ['50%', 0.5], ['전부', 1]] as const).map(([라벨, 비율]) => {
+                  const 변환ExP = Math.floor(ExPoint * 비율)
+                  return (
+                    <TouchableOpacity key={라벨} style={[styles.upgBtn, 변환ExP < 1 && styles.upgBtnOff, { minWidth: 100, paddingHorizontal: 6 }]} onPress={() => ExP를크레딧으로(비율)}>
+                      <Text style={[styles.upgBtnText, { fontSize: 12 }]}>{라벨}</Text>
+                      <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(변환ExP)} → 💰{숫자포맷(변환ExP * EXP_크레딧환율)}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
               </View>
               <Text style={styles.currencySection}>🎰 ExP 뽑기 (1뽑기 = ⭐{EXP_뽑기비용})</Text>
               <Text style={{ color: '#888', fontSize: 9, marginBottom: 3 }}>기본 🔷무색 50 + 확률: 💰6억(0.05%) · 💎각성석(0.15%) · 🔷2만(1%) · 🔷500(10%)</Text>
