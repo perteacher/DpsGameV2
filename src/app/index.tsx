@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Dimensions, Image, ImageBackground, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, Vibration, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import AuthBox from '../AuthBox'
 
 const BG_LOBBY = require('../../assets/images/bg_lobby.png')
 const BG_HUNTING = require('../../assets/images/bg_hunting.png')
@@ -3043,7 +3044,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B15</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B16</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
@@ -3094,6 +3095,7 @@ export default function App() {
           })} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#8a5a2a', borderRadius: 4 }}>
             <Text style={[styles.statSmall, { color: '#fff' }]}>🛒 상점</Text>
           </TouchableOpacity>
+          <AuthBox 저장키={저장키} />
         </View>
       </View>
 
