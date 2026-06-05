@@ -1548,7 +1548,11 @@ export default function App() {
 
   // 저장 로드
   useEffect(() => {
-    AsyncStorage.getItem(저장키).then(json => {
+    // 클라우드 채택 직후 reload면 sessionStorage로 넘어온 데이터를 우선 사용 (autosave 레이스 방지)
+    let _adopt: string | null = null
+    try { _adopt = (typeof window !== 'undefined') ? (window as any).sessionStorage?.getItem('dps_adopt') : null } catch {}
+    if (_adopt) { try { (window as any).sessionStorage?.removeItem('dps_adopt'); AsyncStorage.setItem(저장키, _adopt) } catch {} }
+    ;(_adopt ? Promise.resolve(_adopt) : AsyncStorage.getItem(저장키)).then(json => {
       if (json) {
         try {
           const d = JSON.parse(json)
@@ -3179,7 +3183,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C20</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C21</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>

@@ -137,7 +137,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
       const v = Math.max(cloudVer, myVer)
       await AsyncStorage.setItem(verKey, String(v)); myVerRef.current = v; lastPushRef.current = cloud.json
       setMsg('☁️ 동기화됨 — ' + 진단); set동기화중(false)
-      if (!local) safeReload(); else clearReloadGuard()  // local==cloud = 안정 상태
+      if (!local) { try { (window as any).sessionStorage?.setItem('dps_adopt', cloud.json) } catch {}; safeReload() } else clearReloadGuard()  // local==cloud = 안정 상태
       return
     }
     // 로컬·클라우드 둘 다 데이터 있고 다름
@@ -157,6 +157,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
       try { await AsyncStorage.setItem(저장키, cloud.json); await AsyncStorage.setItem(verKey, String(v)) } catch {}
       lastPushRef.current = cloud.json; myVerRef.current = v; cloudVerRef.current = v
       setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
+      try { (window as any).sessionStorage?.setItem('dps_adopt', cloud.json) } catch {}
       safeReload(); return
     }
     // 로컬이 더 진행됨(or 더 최근, or 동일) → 업로드
@@ -210,6 +211,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     try { await AsyncStorage.setItem(저장키, c.cloudJson); await AsyncStorage.setItem(verKey, String(c.cloudVer)) } catch {}
     lastPushRef.current = c.cloudJson; myVerRef.current = c.cloudVer
     try { await AsyncStorage.setItem(uidKey, user?.uid || '') } catch {}
+    try { (window as any).sessionStorage?.setItem('dps_adopt', c.cloudJson) } catch {}
     set충돌(null)
     safeReload()
   }
