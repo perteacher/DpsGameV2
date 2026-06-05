@@ -67,11 +67,8 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     unsubRef.current = watchSave(uid, d => {
       if (!d) return
       if (typeof d.version === 'number') cloudVerRef.current = Math.max(cloudVerRef.current, d.version)
-      if (d.session && d.session !== sessionRef.current) {
-        setKicked('⚠️ 다른 기기에서 로그인되어 이 기기는 종료되었습니다.')
-        if (unsubRef.current) { unsubRef.current(); unsubRef.current = null }
-        signOut(auth)
-      }
+      // 단일 세션 kick 제거: 여러 기기 동시 로그인해도 강제 종료 안 함.
+      // 진행도(최고강) 기반 동기화 + 업로드 가드로 데이터 보호.
     })
   }
 
@@ -184,10 +181,19 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     if (충돌) { if (강제) setMsg('⚠️ 먼저 충돌을 해결하세요'); return }
     try {
       const local = await AsyncStorage.getItem(저장키)
-      if (local && (강제 || local !== lastPushRef.current)) {
-        const v = await pushLocal(uid, local)
-        if (강제) setMsg(`☁️ 동기화 완료 v${v} ` + new Date().toLocaleTimeString())
-      } else if (강제) setMsg('변경사항 없음')
+      if (!local) { if (강제) setMsg('로컬 데이터 없음'); return }
+      if (!강제 && local === lastPushRef.current) return  // 변경 없음
+      // 클라우드 진행도(최고강)가 더 높으면 덮어쓰기 금지 — 낮은 진행도 기기가 높은 세이브 클로버 방지
+      let cloud: Awaited<ReturnType<typeof cloudLoadRaw>> = null
+      try { cloud = await cloudLoadRaw(uid) } catch {}
+      if (cloud && cloud.json) {
+        cloudVerRef.current = Math.max(cloudVerRef.current, cloud.version || 0)
+        const c최고 = parseInt(최고강(cloud.json)) || 0
+        const l최고 = parseInt(최고강(local)) || 0
+        if (c최고 > l최고) { if (강제) setMsg(`⏸️ 클라우드가 더 진행됨(최고${c최고}강) — 이 기기 업로드 건너뜀`); return }
+      }
+      const v = await pushLocal(uid, local)
+      if (강제) setMsg(`☁️ 동기화 완료 v${v} ` + new Date().toLocaleTimeString())
     } catch (e: any) { if (강제) setMsg('업로드 오류: ' + (e?.message || e)) }
   }
 
@@ -287,7 +293,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
           {열림 && (
             <View style={{ position: 'absolute', top: 28, right: 0, width: 240, backgroundColor: '#16213e', borderWidth: 2, borderColor: '#5a3a8a', borderRadius: 8, padding: 10, zIndex: 999, gap: 6 }}>
               <Text style={{ color: '#7ed957', fontSize: 12, fontWeight: 'bold' }}>☁️ {user.email}</Text>
-              <Text style={{ color: '#aaa', fontSize: 10 }}>2분마다 자동 동기화 · 1기기만 접속</Text>
+              <Text style={{ color: '#aaa', fontSize: 10 }}>2분마다 자동 동기화 (여러 기기 가능)</Text>
               <TouchableOpacity onPress={() => 업로드(user.uid, true)} style={btn('#3a5a8a')}><Text style={bt}>지금 동기화(업로드)</Text></TouchableOpacity>
               <TouchableOpacity onPress={로그아웃} style={btn('#e94560')}><Text style={bt}>로그아웃</Text></TouchableOpacity>
               {(msg || 동기화중) ? <Text style={{ color: '#f5a623', fontSize: 10 }}>{동기화중 ? '동기화 중…' : msg}</Text> : null}
