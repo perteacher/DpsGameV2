@@ -12,22 +12,18 @@ import { auth, cloudLoadRaw, cloudSaveRaw, claimSession, watchSave } from './fir
 function newSession() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function 최고강(j: string | null): string { try { return j ? String(JSON.parse(j).최고마린lv ?? '?') : '-' } catch { return '?' } }
 function 저장시각(j: string | null): number { try { return j ? (JSON.parse(j).마지막저장시간 || 0) : 0 } catch { return 0 } }
-// 무한 새로고침 방지: 같은 데이터(sig)로는 한 번만 새로고침. sig 없으면 4초 시간 차단
-function safeReload(sig?: string) {
+// 폭주 차단: 한 탭 세션에서 새로고침 8회 넘으면 멈춤(무한루프 방지). 안정 상태 도달 시 clearReloadGuard로 리셋.
+function safeReload() {
   if (Platform.OS !== 'web') return
   try {
     const ss = (window as any).sessionStorage
-    if (sig) {
-      if (ss?.getItem('dps_reload_sig') === sig) return  // 같은 데이터로 이미 새로고침함 → 루프 방지
-      ss?.setItem('dps_reload_sig', sig)
-    } else {
-      const last = parseInt(ss?.getItem('dps_reload_at') || '0', 10) || 0
-      if (Date.now() - last < 4000) return
-      ss?.setItem('dps_reload_at', String(Date.now()))
-    }
+    const n = (parseInt(ss?.getItem('dps_reload_n') || '0', 10) || 0) + 1
+    if (n > 8) return
+    ss?.setItem('dps_reload_n', String(n))
   } catch {}
   ;(window as any).location.reload()
 }
+function clearReloadGuard() { try { (window as any).sessionStorage?.setItem('dps_reload_n', '0') } catch {} }
 
 type 충돌타입 = { cloudJson: string; cloudVer: number; cloud최고: string; local최고: string } | null
 
@@ -131,7 +127,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
       const v = Math.max(cloudVer, myVer)
       await AsyncStorage.setItem(verKey, String(v)); myVerRef.current = v; lastPushRef.current = cloud.json
       setMsg('☁️ 동기화됨 — ' + 진단); set동기화중(false)
-      if (!local) safeReload('n:' + cloudVer + ':' + 최고강(cloud.json) + ':' + 저장시각(cloud.json))
+      if (!local) safeReload(); else clearReloadGuard()  // local==cloud = 안정 상태
       return
     }
     // 로컬·클라우드 둘 다 데이터 있고 다름
@@ -151,10 +147,11 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
       try { await AsyncStorage.setItem(저장키, cloud.json); await AsyncStorage.setItem(verKey, String(v)) } catch {}
       lastPushRef.current = cloud.json; myVerRef.current = v; cloudVerRef.current = v
       setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
-      safeReload('a:' + v + ':' + c최고 + ':' + 저장시각(cloud.json)); return
+      safeReload(); return
     }
     // 로컬이 더 진행됨(or 더 최근, or 동일) → 업로드
     await pushLocal(uid, local)
+    clearReloadGuard()  // 업로드 = 안정 상태
     setMsg('☁️ 업로드됨 — ' + 진단); set동기화중(false)
   }
 
@@ -204,7 +201,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     lastPushRef.current = c.cloudJson; myVerRef.current = c.cloudVer
     try { await AsyncStorage.setItem(uidKey, user?.uid || '') } catch {}
     set충돌(null)
-    safeReload('c:' + c.cloudVer + ':' + c.cloud최고 + ':' + 저장시각(c.cloudJson))
+    safeReload()
   }
   async function 충돌_내기기사용() {
     const c = 충돌; if (!c || !user) return
