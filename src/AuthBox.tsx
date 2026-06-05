@@ -28,6 +28,7 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
   const sessionRef = useRef('')
   const lastPushRef = useRef('')
   const unsubRef = useRef<null | (() => void)>(null)
+  const 읽기성공Ref = useRef(false)  // 클라우드 읽기 성공해야만 업로드 허용 (실패 시 덮어쓰기 방지)
 
   useEffect(() => {
     const off = onAuthStateChanged(auth, u => {
@@ -42,12 +43,22 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
 
   async function onLogin(uid: string) {
     setKicked(''); set동기화중(true)
-    let local: string | null = null, mySess: string | null = null, cloud: Awaited<ReturnType<typeof cloudLoadRaw>> = null
+    읽기성공Ref.current = false
+    let local: string | null = null, mySess: string | null = null
+    let cloud: Awaited<ReturnType<typeof cloudLoadRaw>> = null
     try {
       local = await AsyncStorage.getItem(저장키)
       mySess = await AsyncStorage.getItem(저장키 + '_sess')
       cloud = await cloudLoadRaw(uid)
-    } catch (e: any) { setMsg('로드 오류: ' + (e?.message || e)); set동기화중(false); return }
+    } catch (e: any) {
+      // 읽기 실패 → 업로드 차단(태블릿 데이터 보호) + 에러 표시
+      setMsg('❌ 클라우드 읽기 실패: ' + (e?.code || e?.message || e) + ' — 업로드 차단됨')
+      set동기화중(false); return
+    }
+    읽기성공Ref.current = true
+    // 진단: 클라우드/로컬 상태
+    const _lv = (j: string | null) => { try { return j ? (JSON.parse(j).최고마린lv ?? '?') : '-' } catch { return '?' } }
+    const 진단 = `클라우드:${cloud ? `있음(최고${_lv(cloud.json)}강,${cloud.json.length}자)` : '없음'} / 로컬:${local ? `최고${_lv(local)}강` : '없음'}`
 
     // 세션 점유 + 영속 먼저 (루프 방지 + 채택 후 즉시 reload 가능)
     const sid = newSession(); sessionRef.current = sid
@@ -58,7 +69,7 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
     if (cloud && adopt) {
       try { await AsyncStorage.setItem(저장키, cloud.json) } catch {}
       lastPushRef.current = cloud.json
-      setMsg('☁️ 불러옴'); set동기화중(false)
+      setMsg('☁️ 클라우드 불러옴 — ' + 진단); set동기화중(false)
       // ★ 즉시 새로고침 (지연 주면 옛 자동저장이 덮어씀)
       if (Platform.OS === 'web') { (window as any).location.reload() }
       return
@@ -66,7 +77,7 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
 
     // 내 기기가 최신(또는 클라우드 없음) → 로컬 업로드
     if (local) { try { await cloudSaveRaw(uid, local) } catch {} ; lastPushRef.current = local }
-    setMsg(cloud ? '☁️ 동기화됨' : '☁️ 업로드됨'); set동기화중(false)
+    setMsg((cloud ? '☁️ 동기화됨(내기기 최신) — ' : '☁️ 업로드됨(클라우드 없었음) — ') + 진단); set동기화중(false)
 
     // 실시간 감시 (다른 기기 로그인 시 종료)
     if (unsubRef.current) unsubRef.current()
@@ -88,6 +99,7 @@ export default function AuthBox({ 저장키, onAuth }: { 저장키: string; onAu
   }, [user])
 
   async function 업로드(uid: string, 강제 = false) {
+    if (!읽기성공Ref.current) { if (강제) setMsg('⚠️ 동기화 미완료 상태 — 업로드 차단(데이터 보호)'); return }
     try {
       const local = await AsyncStorage.getItem(저장키)
       if (local && (강제 || local !== lastPushRef.current)) {
