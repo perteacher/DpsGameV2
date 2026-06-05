@@ -44,6 +44,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
   const cloudVerRef = useRef(0)         // 실시간 추적되는 클라우드 현재 버전
   const 읽기성공Ref = useRef(false)
   const unsubRef = useRef<null | (() => void)>(null)
+  const claimTimeRef = useRef(0)   // 세션 점유 시각 — 직후 stale 스냅샷으로 자기 자신 kick 방지
 
   const verKey = 저장키 + '_ver'
   const sessKey = 저장키 + '_sess'
@@ -63,8 +64,13 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     unsubRef.current = watchSave(uid, d => {
       if (!d) return
       if (typeof d.version === 'number') cloudVerRef.current = Math.max(cloudVerRef.current, d.version)
-      // 단일 세션 kick 제거: 여러 기기 동시 로그인해도 강제 종료 안 함.
-      // 진행도(최고강) 기반 동기화 + 업로드 가드로 데이터 보호.
+      // 단일 세션: 다른 기기가 로그인(세션 변경)하면 이 기기는 로그아웃
+      if (d.session && d.session !== sessionRef.current) {
+        if (Date.now() - claimTimeRef.current < 3000) return  // 내 점유 직후 stale 스냅샷 무시(자기 kick 방지)
+        setKicked('⚠️ 다른 기기에서 로그인되어 이 기기는 종료되었습니다.')
+        if (unsubRef.current) { unsubRef.current(); unsubRef.current = null }
+        signOut(auth)
+      }
     })
   }
 
@@ -89,7 +95,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
     const 진단 = `클라우드:${cloud ? `v${cloudVer}·최고${최고강(cloud.json)}강` : '없음'} / 로컬:v${myVer}·최고${최고강(local)}강`
 
     // 세션 점유(kick용) + 영속 + 감시
-    const sid = newSession(); sessionRef.current = sid
+    const sid = newSession(); sessionRef.current = sid; claimTimeRef.current = Date.now()
     try { await claimSession(uid, sid); await AsyncStorage.setItem(sessKey, sid) } catch {}
     startWatch(uid)
 
@@ -290,7 +296,7 @@ export default function AuthBox({ 저장키, onAuth, 보너스요약 }: { 저장
           {열림 && (
             <View style={{ position: 'absolute', top: 28, right: 0, width: 240, backgroundColor: '#16213e', borderWidth: 2, borderColor: '#5a3a8a', borderRadius: 8, padding: 10, zIndex: 999, gap: 6 }}>
               <Text style={{ color: '#7ed957', fontSize: 12, fontWeight: 'bold' }}>☁️ {user.email}</Text>
-              <Text style={{ color: '#aaa', fontSize: 10 }}>2분마다 자동 동기화 (여러 기기 가능)</Text>
+              <Text style={{ color: '#aaa', fontSize: 10 }}>2분마다 자동 동기화 · 1기기만 접속</Text>
               <TouchableOpacity onPress={() => 업로드(user.uid, true)} style={btn('#3a5a8a')}><Text style={bt}>지금 동기화(업로드)</Text></TouchableOpacity>
               <TouchableOpacity onPress={로그아웃} style={btn('#e94560')}><Text style={bt}>로그아웃</Text></TouchableOpacity>
               {(msg || 동기화중) ? <Text style={{ color: '#f5a623', fontSize: 10 }}>{동기화중 ? '동기화 중…' : msg}</Text> : null}
