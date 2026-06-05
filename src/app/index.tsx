@@ -231,12 +231,12 @@ function 강화비용(단계: number) {
   return 30 + 단계 * 20
 }
 
-// 강화 실패 페널티: 항상 파괴 (40~49강만 파괴방지 적용 — 신규 사양)
+// 강화 실패 페널티: 항상 파괴 (6~49강에 파괴방지 적용)
 // 파괴방지: 포인트당 0.1% 파괴방지율, 최대 95%
 function 강화실패결과(lv: number, 파괴방지: number = 0): { 감소: number; 파괴: boolean } {
   if (lv <= 5) return { 감소: 0, 파괴: false }  // 5강 이하 안전
-  // 파괴방지는 40~49강 강화 실패에만 적용
-  if (lv >= 40 && lv <= 49) {
+  // 파괴방지는 6~49강 강화 실패에 적용 (50강 초월·51강+ 제외)
+  if (lv <= 49) {
     const 방지율 = Math.min(0.95, 파괴방지 * 0.001)
     if (Math.random() < 방지율) return { 감소: 0, 파괴: false }
   }
@@ -3062,7 +3062,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B20</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B21</Text></Text>
 
       <View style={styles.statBox}>
         <View style={styles.statRow}>
