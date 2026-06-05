@@ -1555,6 +1555,7 @@ export default function App() {
           if (typeof d.자동구입ON === 'boolean') set자동구입ON(d.자동구입ON)
           if (typeof d.자동구입배수 === 'number') set자동구입배수(Math.max(1, d.자동구입배수))
           if (typeof d.내부계산모드 === 'boolean') set내부계산모드(d.내부계산모드)
+          if (typeof d.다음ExP지급시각 === 'number') set다음ExP지급시각(d.다음ExP지급시각)
           if (d.업그레이드 && typeof d.업그레이드 === 'object') set업그레이드(prev => ({ ...prev, ...d.업그레이드}))
           if (typeof d.캐릭레벨 === 'number') set캐릭레벨(d.캐릭레벨)
           if (typeof d.경험치 === 'number') set경험치(d.경험치)
@@ -1627,7 +1628,7 @@ export default function App() {
       환생레벨, 누적환생수, 누적50강생산,
       누적강화성공, 누적판매, 최고마린lv, 융합누적,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수,
-      내부계산모드,
+      내부계산모드, 다음ExP지급시각,
       강화최초달성: Array.from(강화최초달성),
       마지막저장시간: Date.now(),
     }))
@@ -2612,28 +2613,24 @@ export default function App() {
   // ExP → 크레딧 변환 (보유량 비율로 한번에 환전)
   const EXP_크레딧환율 = 100000
 
-  // 시간당 ExP 패시브 — 온라인(게임 켜둔 동안)에만, 20분 단위로 지급
+  // 시간당 ExP 패시브 — 온라인에만 지급, 20분 주기. 다음지급시각을 세이브에 저장해 새로고침/로그아웃에도 유지
   const 최고마린lvRef2 = useRef(최고마린lv); 최고마린lvRef2.current = 최고마린lv
+  const 다음ExP지급시각Ref = useRef(다음ExP지급시각); 다음ExP지급시각Ref.current = 다음ExP지급시각
   useEffect(() => {
-    set다음ExP지급시각(Date.now() + 20 * 60 * 1000)
+    if (!다음ExP지급시각Ref.current) set다음ExP지급시각(Date.now() + 20 * 60 * 1000)  // 저장된 값 없을 때만 초기화(있으면 유지)
     const id = setInterval(() => {
-      set다음ExP지급시각(Date.now() + 20 * 60 * 1000)
-      if (!로그인됨Ref.current) return  // 로그인 안 하면 지급 X
-      const lv = Math.min(50, Math.max(45, 최고마린lvRef2.current || 1))
-      const 시간당 = 판매크레딧비용(lv) / EXP_크레딧환율 * EXP_시간당판매분
-      const 지급 = Math.floor(시간당 / 3)  // 20분 = 1/3시간
-      if (지급 > 0) { setExPoint(p => p + 지급); set마지막ExP지급액(지급); 메시지표시(`⭐ 20분 보상 +${숫자포맷(지급)} ExP`) }
-    }, 20 * 60 * 1000)  // 20분
+      if (!로그인됨Ref.current) return  // 로그인 안 하면 타이머 정지(시간 보존)
+      const now = Date.now()
+      const 목표 = 다음ExP지급시각Ref.current
+      if (목표 && now >= 목표) {
+        const lv = Math.min(50, Math.max(45, 최고마린lvRef2.current || 1))
+        const 지급 = Math.floor(판매크레딧비용(lv) / EXP_크레딧환율 * EXP_시간당판매분 / 3)  // 20분분
+        if (지급 > 0) { setExPoint(p => p + 지급); set마지막ExP지급액(지급); 메시지표시(`⭐ 20분 보상 +${숫자포맷(지급)} ExP`) }
+        set다음ExP지급시각(now + 20 * 60 * 1000)
+      }
+    }, 5000)
     return () => clearInterval(id)
   }, [])
-  function ExP를크레딧으로(비율: number) {
-    const 변환ExP = Math.floor(ExPointRef.current * 비율)
-    if (변환ExP < 1) { 메시지표시('⭐ 변환할 ExP가 부족합니다'); return }
-    const 획득크레딧 = 변환ExP * EXP_크레딧환율
-    setExPoint(p => p - 변환ExP)
-    set크레딧(p => p + 획득크레딧)
-    메시지표시(`⭐${숫자포맷(변환ExP)} → 💰${숫자포맷(획득크레딧)} 크레딧`)
-  }
 
   // ExP 뽑기: 1뽑기당 EXP_뽑기비용 ExP. 기본 무색조각 50 + 확률 추가지급. 배수(횟수) 지원.
   const EXP_뽑기비용 = 1
@@ -3080,7 +3077,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build B26</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>build c1</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
@@ -3195,19 +3192,6 @@ export default function App() {
                   )
                 })()}
               </View>
-              <Text style={styles.currencySection}>⭐ ExP → 💰 크레딧 (1 : {숫자포맷(EXP_크레딧환율)})</Text>
-              <View style={styles.currencyBtnRow}>
-                {([['25%', 0.25], ['50%', 0.5], ['전부', 1]] as const).map(([라벨, 비율]) => {
-                  const 변환ExP = Math.floor(ExPoint * 비율)
-                  return (
-                    <TouchableOpacity key={라벨} style={[styles.upgBtn, 변환ExP < 1 && styles.upgBtnOff, { minWidth: 100, paddingHorizontal: 6 }]} onPress={() => ExP를크레딧으로(비율)}>
-                      <Text style={[styles.upgBtnText, { fontSize: 12 }]}>{라벨}</Text>
-                      <Text style={[styles.upgBtnText, { fontSize: 9, color: '#cdd' }]}>⭐{숫자포맷(변환ExP)} → 💰{숫자포맷(변환ExP * EXP_크레딧환율)}</Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-
               <Text style={styles.currencySection}>🎰 ExP 뽑기 (1뽑기 = ⭐{EXP_뽑기비용})</Text>
               <Text style={{ color: '#888', fontSize: 9, marginBottom: 3 }}>기본 🔷무색 50 + 확률: 💰6억(0.05%) · 💎각성석(0.15%) · 🔷2만(1%) · 🔷500(10%)</Text>
               <View style={styles.currencyBtnRow}>
