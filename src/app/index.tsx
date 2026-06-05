@@ -1884,10 +1884,14 @@ export default function App() {
             // 55강은 56강 융합 대기 — 판매 불가 (강화소에서 융합풀로 흡수)
             return { ...m, state: 'idle', dest: null }
           }
-          // 크레딧 검증 — 부족하면 판매 취소 (마린 보존)
+          // 크레딧 검증 — 부족하면 판매 취소 (마린 보존). 자동판매 중이면 OFF
           const _cost = 판매크레딧비용Pre(m.lv)
           if (가용크레딧Tick < _cost) {
-            if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 2000) {
+            if (자동판매ONRef.current) {
+              자동판매ONRef.current = false
+              set자동판매ON(false)
+              메시지표시(`💰 크레딧 부족 — 자동판매 OFF (${숫자포맷(_cost)} 필요)`)
+            } else if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 2000) {
               메시지표시(`💰 크레딧이 부족합니다 (${숫자포맷(_cost)} 필요)`)
             }
             return { ...m, state: 'idle', dest: null }
@@ -3175,7 +3179,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C14</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C15</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
