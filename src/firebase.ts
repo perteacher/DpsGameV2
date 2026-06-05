@@ -19,12 +19,16 @@ export const db = getFirestore(app)
 export type 세이브문서 = { json?: string; 마지막저장시간?: number; session?: string; updated?: number }
 
 // 세이브 문서: saves/{uid}
-export async function cloudLoadRaw(uid: string): Promise<{ json: string; 마지막저장시간: number } | null> {
+export async function cloudLoadRaw(uid: string): Promise<{ json: string; 마지막저장시간: number; session: string } | null> {
   const snap = await getDoc(doc(db, 'saves', uid))
   if (!snap.exists()) return null
   const d = snap.data() as 세이브문서
   if (typeof d.json !== 'string') return null
-  return { json: d.json, 마지막저장시간: typeof d.마지막저장시간 === 'number' ? d.마지막저장시간 : 0 }
+  return {
+    json: d.json,
+    마지막저장시간: typeof d.마지막저장시간 === 'number' ? d.마지막저장시간 : 0,
+    session: typeof d.session === 'string' ? d.session : '',
+  }
 }
 
 // 세이브 저장 (merge: session 필드 유지)

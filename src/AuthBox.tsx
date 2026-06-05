@@ -48,7 +48,7 @@ export default function AuthBox({ 저장키 }: { 저장키: string }) {
     await syncOnLogin(uid)
     // 단일 세션 등록 + 실시간 감시
     const sid = newSession(); sessionRef.current = sid
-    try { await claimSession(uid, sid) } catch {}
+    try { await claimSession(uid, sid); await AsyncStorage.setItem(저장키 + '_sess', sid) } catch {}
     if (unsubRef.current) unsubRef.current()
     unsubRef.current = watchSave(uid, d => {
       if (!d) return
@@ -63,22 +63,31 @@ export default function AuthBox({ 저장키 }: { 저장키: string }) {
     })
   }
 
-  // 로그인 직후 동기화 (마지막저장시간 비교)
+  // 로그인 직후 동기화 — "세션 소유권" 기준 (시각 비교는 항상-최신 로컬 때문에 불가)
   async function syncOnLogin(uid: string) {
     try {
       set동기화중(true)
       const local = await AsyncStorage.getItem(저장키)
-      const localT = parse시간(local)
+      const mySess = await AsyncStorage.getItem(저장키 + '_sess')  // 이 기기가 마지막에 점유한 세션
       const cloud = await cloudLoadRaw(uid)
-      if (cloud && cloud.마지막저장시간 > localT) {
-        await AsyncStorage.setItem(저장키, cloud.json)
-        lastPushRef.current = cloud.json
-        setMsg('☁️ 클라우드 세이브 불러옴 — 새로고침')
-        if (Platform.OS === 'web') setTimeout(() => (window as any).location.reload(), 600)
-      } else if (local) {
-        await cloudSaveRaw(uid, local); lastPushRef.current = local
-        setMsg('☁️ 현재 진행도 업로드됨')
-      } else { setMsg('로그인됨') }
+      if (!cloud) {
+        // 클라우드 없음(최초) → 로컬 업로드
+        if (local) { await cloudSaveRaw(uid, local); lastPushRef.current = local; setMsg('☁️ 진행도 업로드됨') }
+        else setMsg('로그인됨')
+      } else if (cloud.session && mySess && cloud.session === mySess) {
+        // 클라우드를 마지막에 쓴 게 '이 기기' → 로컬 유지(같은 기기 재접속)
+        if (local && local !== cloud.json) { await cloudSaveRaw(uid, local); lastPushRef.current = local }
+        else lastPushRef.current = cloud.json
+        setMsg('☁️ 동기화됨')
+      } else {
+        // 다른 기기가 마지막 작성자 → 클라우드 받아오기(이게 핵심 수정)
+        if (cloud.json !== local) {
+          await AsyncStorage.setItem(저장키, cloud.json)
+          lastPushRef.current = cloud.json
+          setMsg('☁️ 다른 기기 세이브 불러옴 — 새로고침')
+          if (Platform.OS === 'web') setTimeout(() => (window as any).location.reload(), 600)
+        } else { lastPushRef.current = cloud.json; setMsg('☁️ 동기화됨') }
+      }
     } catch (e: any) { setMsg('동기화 오류: ' + (e?.message || e)) }
     finally { set동기화중(false) }
   }
