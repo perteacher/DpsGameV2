@@ -376,9 +376,10 @@ function 다음경험치(lv: number): number {
   if (lv >= 캐릭레벨최대) return Infinity
   return 3 * lv * (lv - 1) + 10
 }
-// 초월경험치 → 초월레벨업 필요량 (30만 레벨 도달 후). 초월lv 1당 100 증가
+// 초월경험치 → 초월레벨업 필요량 (원본 맵 DB1 테이블: lv→lv+1 = 3·lv·(lv-1)+10, 초월1렙=10)
 function 다음초월경험치(초월lv: number): number {
-  return 100 * Math.max(1, 초월lv)
+  const lv = Math.max(1, 초월lv)
+  return 3 * lv * (lv - 1) + 10
 }
 // 51강 강화 1회 시도당 초월경험치
 const 강화51초월경험 = 1
@@ -3148,7 +3149,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C10</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C11</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
