@@ -347,11 +347,11 @@ function 유닛DPS(단계: number) {
   return 공격력(단계) * 공격속도(단계) * 연타수(단계)
 }
 
-// 51강+ 소득 배수: 51강 리셋된 낮은 공격력 보정 + 단계별 성장 → 50강보다 항상 더 잘 벌도록
-// (50강 소득 ∝ 공격력×공속 ≈ 65500×6.67. 51강 base=30×1.67이므로 ×50000부터 시작)
+// 51강+ 소득 배수: 51강 리셋된 낮은 공격력 보정 + 단계별 성장. 51강 ≈ 50강 수준(약간↑), 단계당 ×3.
+// (50강 소득 ∝ 65500×6.67. 51강 base=30×1.67 → ×9000이면 51강≈50강의 약 1.03배)
 function 소득배수(단계: number): number {
   if (단계 < 51) return 1
-  return 50000 * Math.pow(3, 단계 - 51)
+  return 9000 * Math.pow(3, 단계 - 51)
 }
 
 // DPS 단계별 자원 배수
@@ -2121,7 +2121,8 @@ export default function App() {
               추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * 소득배수(n.lv) * 자원전역배율
               // 사냥터 3 (허수광산) → 크레딧 + 돈 동시 (풍요/풍성/부유/세공 보주 배수)
               if (tier === 3) {
-                추가크레딧 += Math.max(1, Math.floor(dmg / 1000 * 광산크레딧배수))
+                // 크레딧도 소득배수 보정 (51강 공격력 리셋 → 미보정 시 크레딧 ~0이던 문제 수정)
+                추가크레딧 += Math.max(1, Math.floor(dmg * 소득배수(n.lv) / 1000 * 광산크레딧배수))
               }
               // (타격수는 '타격수 측정기'에서만 누적)
               플래시몹.push(target.id)
@@ -2258,6 +2259,7 @@ export default function App() {
         if (구입수 > 0) {
           자동구입타이머Ref.current = now
           잔여Mineral -= cost * 구입수
+          if (lv >= 50) set누적50강생산(p => p + 구입수)  // 50강 자동생산 → 환생보상 반영
           set마린들(prev => {
             let bc = prev.filter(m => m.location === 'base').length
             const 추가: 마린[] = []
@@ -2873,6 +2875,7 @@ export default function App() {
     }
     const 총비용 = 단가 * 실수량
     setMineral(prev => prev - 총비용)
+    if (강도 >= 50) set누적50강생산(p => p + 실수량)  // 50강 수동생산 → 환생보상 반영
     set마린들(prev => {
       let bc = prev.filter(m => m.location === 'base').length
       const 추가: 마린[] = []
@@ -3187,7 +3190,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C22</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C23</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
