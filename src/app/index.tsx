@@ -32,6 +32,8 @@ const 저장키 = 'dps_game_save_v4'  // v4: 보주/크리스탈 시스템
 const 단위목록 = ['', '만', '억', '조', '경', '해', '자', '양', '구', '간', '정', '재', '극', '항', '아', '나', '불', '무']
 
 function 숫자포맷(n: number): string {
+  if (!isFinite(n)) return isNaN(n) ? '0' : (n > 0 ? '∞' : '-∞')  // Infinity/NaN 가드 ("Infinity무" 표시 방지)
+  if (n < 0) return '-' + 숫자포맷(-n)
   if (n < 10000) return Math.floor(n).toString()
   let i = 0
   let v = n
@@ -1686,7 +1688,7 @@ export default function App() {
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 누적50강생산, 누적60강희생,
       누적강화성공, 누적판매, 최고마린lv, 융합누적,
-      자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수, 내부계산모드, 로드완료])
+      자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수, 내부계산모드, 다음ExP지급시각, 로드완료])
 
   // ============================================
   // 게임 루프
@@ -1748,6 +1750,7 @@ export default function App() {
       const huntingDPS = 보스처치수Ref.current >= 10 ? 0 : bossMarines.filter(m => m.state === 'attacking').reduce((s, m) => s + 효과DPS(m.lv), 0)
       if (huntingDPS > 최고DPSRef.current) {
         set최고DPS(huntingDPS)
+        최고DPSRef.current = huntingDPS  // 같은 틱 currentBatch가 최신값 쓰도록 즉시 동기화
       }
       // 고유유닛 단수 효과: 채광력 +1/단(+1당 자원배수 +1) — currentBatch에 추가
       const _단수 = 고유유닛Ref.current.단수
@@ -2305,8 +2308,8 @@ export default function App() {
       }
 
       // currency 업데이트
-      if (잔여Mineral !== currentMineral) setMineral(잔여Mineral + 추가미네랄)
-      else if (추가미네랄 > 0) setMineral(prev => prev + 추가미네랄)
+      if (잔여Mineral !== currentMineral) { setMineral(잔여Mineral + 추가미네랄); mineralRef.current = 잔여Mineral + 추가미네랄 }  // ref 즉시 동기화 → 다음 틱 자동구입 과지출 방지
+      else if (추가미네랄 > 0) { setMineral(prev => prev + 추가미네랄); mineralRef.current = currentMineral + 추가미네랄 }
       if (추가크레딧 > 0) { const _a = Math.floor(추가크레딧); set크레딧(prev => prev + _a); 크레딧Ref.current += _a }
       if (판매무색 > 0) set무색조각(prev => prev + 판매무색)
       if (판매응무조 > 0) set응무조(prev => prev + 판매응무조)
@@ -3207,7 +3210,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C26</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C27</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
