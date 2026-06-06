@@ -2093,6 +2093,10 @@ export default function App() {
           if (n.state === 'idle' || n.state === 'hold') {
             const 가까운적 = nearestEnemy(n.pos)
             if (가까운적) { n.state = 'attacking'; n.타겟적id = 가까운적.id }
+            else if (n.state === 'idle' && currentEnemies.length > 0) {
+              // 보스가 사거리 밖이어도 보스 쪽으로 이동하며 자동 공격 (입장 시 자동 교전)
+              n.state = 'attacking'; n.타겟적id = currentEnemies[0].id
+            }
             return n
           }
           return n
@@ -3183,7 +3187,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C21</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C22</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
@@ -3485,7 +3489,7 @@ export default function App() {
           style={[styles.tab, 현재화면 === 'boss' && styles.tabActiveRed]}
           onPress={() => { set현재화면('boss'); set선택ID([]) }}
         >
-          <Text style={styles.tabText}>⚔️ 보스 ({보스존마린들.length}/{보스존캡})</Text>
+          <Text style={styles.tabText}>{보스처치수 >= 10 ? `💀 엑스트라 (${보스존마린들.length}/${보스존캡})` : `⚔️ 보스 (${보스존마린들.length}/${보스존캡})`}</Text>
         </TouchableOpacity>
       </View>
 
@@ -3580,7 +3584,7 @@ export default function App() {
                 borderWidth: 0,
               }]} pointerEvents="none">
                 <Image source={img} style={{ width: z.w, height: z.h - 14, resizeMode: 'contain' }} />
-                <Text style={[styles.zoneLabel, { color: z.color, textShadowColor: '#000', textShadowRadius: 3, width: z.w, textAlign: 'center' }]}>{z.label}</Text>
+                <Text style={[styles.zoneLabel, { color: z.color, textShadowColor: '#000', textShadowRadius: 3, width: z.w, textAlign: 'center' }]}>{z === ZONE_보스존입구 && 보스처치수 >= 10 ? '💀 엑스트라 보스존' : z.label}</Text>
               </View>
             ))}
           </>
@@ -3700,7 +3704,7 @@ export default function App() {
                 <Text style={{ fontSize: 68 }}>👹</Text>
               </View>
               <Text style={[styles.bossLabel, { left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 50, width: 200, color: '#fff' }]}>
-                👹 보스 {보스처치수 + 1}/10
+                {보스처치수 >= 10 ? '💀 엑스트라 보스존' : `👹 보스 ${보스처치수 + 1}/10`}
               </Text>
               <Text style={[styles.bossLabel, {
                 left: e.pos.x - 100, top: e.pos.y - 보스_크기 / 2 - 34, width: 200,
