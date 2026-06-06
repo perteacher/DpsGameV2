@@ -2218,7 +2218,9 @@ export default function App() {
         판매무색 += Math.round(r.무색조각 * 판매보상배수 * 무색배수 * 재x)
         판매응무조 += Math.round(r.응무조 * 판매보상배수 * 재x)
         판매크리조각 += Math.round(r.크리스탈조각 * 판매보상배수 * 조각배수 * 재x)
-        판매ExP += Math.round(r.ExP * 판매보상배수 * 재x)
+        // 52강+ 판매의 'ExP' 보상(500~2500만)은 초월XP로 적립 (ExPoint 아님). 큰 보상이 ExPoint로 새던 문제 수정
+        if (s.lv >= 52) 추가초월경험 += Math.round(r.ExP * 판매보상배수 * 재x)
+        else 판매ExP += Math.round(r.ExP * 판매보상배수 * 재x)
         판매각성 += Math.round(r.각성보석 * 각성배수 * 재x)
         판매은하 += r.은하조각
         판매자각 += r.자각보주
@@ -2391,6 +2393,7 @@ export default function App() {
         if (판매응무조 > 0) parts.push(`💠+${숫자포맷(판매응무조)}`)
         if (판매크리조각 > 0) parts.push(`🔮+${숫자포맷(판매크리조각)}`)
         if (판매ExP > 0) parts.push(`⭐+${숫자포맷(판매ExP)}`)
+        if (추가초월경험 > 0) parts.push(`🌀+${숫자포맷(추가초월경험)}초월XP`)
         if (판매각성 > 0) parts.push(`💎+${판매각성}각성`)
         if (판매은하 > 0) parts.push(`🌌+${판매은하}은하`)
         if (판매자각 > 0) parts.push(`🔯+${판매자각}자각`)
@@ -3210,7 +3213,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C28</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C29</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
