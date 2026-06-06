@@ -2211,7 +2211,7 @@ export default function App() {
         for (const 등급 of r.박스) 판매크리스탈드랍.push(박스개봉(등급))
       }
       if (희생60 > 0) set누적60강희생(p => p + 희생60)
-      if (총소모크레딧 > 0) set크레딧(prev => prev - 총소모크레딧)
+      if (총소모크레딧 > 0) { set크레딧(prev => Math.max(0, prev - 총소모크레딧)); 크레딧Ref.current = Math.max(0, 크레딧Ref.current - 총소모크레딧) }  // ref 즉시 동기화 → 다음 틱 중복차감(음수) 방지
       // id=-1 마린 제거 (판매소 도달 + 강화 실패 파괴 + 56강 융합 흡수)
       const finalMarines = newMarines.filter(m => m.id !== -1)
       // 56강 융합: 흡수한 55강 누적 → 필요수 도달 시 56강 1마리씩 생성
@@ -2292,14 +2292,14 @@ export default function App() {
       // currency 업데이트
       if (잔여Mineral !== currentMineral) setMineral(잔여Mineral + 추가미네랄)
       else if (추가미네랄 > 0) setMineral(prev => prev + 추가미네랄)
-      if (추가크레딧 > 0) set크레딧(prev => prev + Math.floor(추가크레딧))
+      if (추가크레딧 > 0) { const _a = Math.floor(추가크레딧); set크레딧(prev => prev + _a); 크레딧Ref.current += _a }
       if (판매무색 > 0) set무색조각(prev => prev + 판매무색)
       if (판매응무조 > 0) set응무조(prev => prev + 판매응무조)
       if (판매크리조각 > 0) set크리스탈조각(prev => prev + 판매크리조각)
       if (판매각성 > 0) set각성의보석(prev => prev + 판매각성)
       if (판매은하 > 0) set은하조각(prev => prev + 판매은하)
       if (판매자각 > 0) set자각보주(prev => prev + 판매자각)
-      if (판매크레딧 > 0) set크레딧(prev => prev + 판매크레딧)
+      if (판매크레딧 > 0) { set크레딧(prev => prev + 판매크레딧); 크레딧Ref.current += 판매크레딧 }
       if (판매일반XP > 0) XP획득(판매일반XP)
       // 크리스탈 박스 결과 (각각 1개씩 명칭크리스탈에 +1, max 캡)
       if (판매크리스탈드랍.length > 0) {
@@ -3190,7 +3190,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C23</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C24</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
