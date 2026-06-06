@@ -963,7 +963,7 @@ type 고유유닛스텟 = {
   공격력: number; 공속: number; 경험치: number; 추가1강: number; 특수강화: number
   위치: 1 | 2        // 사1 또는 사2 (사3은 진입 X). 26강+ 마린 존재시 자동 사2
   파괴방지: number
-  단수: number       // 1+. n→n+1 비용=각성의보석 n개. 단수효과 = 1.1^(n-1) 곱
+  단수: number       // 1+. n→n+1 비용=각성의보석 n개. 단수효과 = √n (사냥수입 배율)
 }
 const 초기고유유닛: 고유유닛스텟 = { 공격력: 0, 공속: 0, 경험치: 0, 추가1강: 0, 특수강화: 0, 위치: 1, 파괴방지: 0, 단수: 1 }
 
@@ -1750,14 +1750,14 @@ export default function App() {
       }
       // 고유유닛 단수 효과: 채광력 +1/단(+1당 자원배수 +1) — currentBatch에 추가
       const _단수 = 고유유닛Ref.current.단수
-      const 채광력보너스 = _단수 - 1  // 1단=0, 2단=+1, ...
+      const 채광력보너스 = Math.sqrt(_단수) - 1  // √단수 곡선: 1단=0, 1만단≈+99, 40억단≈+6.3만 (지수 폭주 방지)
       const currentBatch = (자원배수(Math.max(huntingDPS, 최고DPSRef.current)) + 채광력보너스) * (1 + 보주배수)
       // 사냥터 곱셈 보너스 — 복리: 1.025^재물(하향) × 1.1^각성
       const _재물 = 보석Ref.current.재물 || 0
       const _각성 = 각성의보석Ref.current || 0
       const 사냥터곱셈 = Math.pow(1.025, _재물) * Math.pow(1.1, _각성)
       // Lv3 사냥터 단수 배율: 단수 1당 +10%
-      const Lv3단수배율 = Math.pow(1.1, Math.max(0, _단수 - 1))  // 1단=1, 2단=1.1, 3단=1.21, ...
+      const Lv3단수배율 = Math.sqrt(Math.max(1, _단수))  // √단수 곡선: 1단=1, 1만단=100, 1억단=1만, 40억단≈6.3만
       const 보스게이트 = 보스DPS게이트(보스처치수Ref.current + 1)
 
       // 필드 경계 클램프
@@ -1811,6 +1811,13 @@ export default function App() {
         if (m.state !== 'idle') return m
         // 보스존 입구 (max 8 고정)
         if (점이구역안에(m.pos, ZONE_보스존입구)) {
+          if (보스처치수Ref.current >= 10) {
+            // 엑스트라 보스존(10단계 클리어) — 입장 불가
+            if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 1500) {
+              메시지표시('🚫 엑스트라 보스존 — 입장 불가')
+            }
+            return { ...m, state: 'idle', dest: null }
+          }
           if (기존보스존수 + 보스존추가 < 보스존캡) {
             const 새m = {
               ...m,
@@ -2803,9 +2810,9 @@ export default function App() {
   function 단수업가능(u: 고유유닛스텟): boolean {
     return u.공격력 >= 20 && u.공속 >= 6 && u.경험치 >= 5 && u.추가1강 >= 20 && u.특수강화 >= 10 && u.파괴방지 >= 200
   }
-  // 단수 배율: 1.1^(n-1) (1단=1, 2단=1.1, 3단=1.21, ...)
+  // 단수 배율: √단수 (1단=1, 1만단=100, 1억단=1만, 40억단≈6.3만)
   function 단수배율(단수: number): number {
-    return Math.pow(1.1, Math.max(0, 단수 - 1))
+    return Math.sqrt(Math.max(1, 단수))
   }
   // 크리스탈 레벨업 (같은 종류 N개 소모 → 레벨 +1)
   function 크리스탈레벨업(key: keyof 명칭크리스탈목록) {
@@ -3190,7 +3197,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C24</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C25</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
@@ -4171,7 +4178,7 @@ export default function App() {
               위치: 사냥터 1 고정
             </Text>
             <Text style={[styles.prodSubtitle, { color: '#ff6ad9' }]}>
-              🌟 단수 {고유유닛.단수}단 · Lv3 단가 ×{단수배율(고유유닛.단수).toFixed(2)} · 채광력 +{고유유닛.단수 - 1}
+              🌟 단수 {고유유닛.단수}단 · Lv3 단가 ×{숫자포맷(Math.round(단수배율(고유유닛.단수)))} · 채광력 +{숫자포맷(Math.round(Math.sqrt(고유유닛.단수) - 1))}
               {단수업가능(고유유닛) ? ` · 다음 각성 💎×${단수업비용(고유유닛.단수)} (보유 ${각성의보석})` : ' · (모든 강화 MAX시 각성)'}
             </Text>
             <ScrollView style={{ maxHeight: 필드_H - 120 }}>
