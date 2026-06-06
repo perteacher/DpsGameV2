@@ -387,7 +387,7 @@ function 다음초월경험치(초월lv: number): number {
 const 강화51초월경험 = 1
 // 52강+ 유닛 판매 시 초월경험치 (강도별, 밸런스값 — 조정 가능)
 const 판매초월경험표: Record<number, number> = {
-  52: 100, 53: 350, 54: 10000, 55: 160000, 56: 3000000,
+  52: 20, 53: 350, 54: 10000, 55: 160000, 56: 3000000,
   57: 50000000, 58: 1000000000, 59: 30000000000, 60: 1000000000000,
 }
 
@@ -1430,7 +1430,7 @@ export default function App() {
       else if (lv === 58) tb = (ts.추가58강 || 0) * 0.001
       타입 = '초월 확률'; 확률 = [`성공 ${pct(외부 + tb)}`]
     }
-    else if (lv === 50) { 타입 = '초월 시도 (50→51)'; 확률 = [`성공 ${pct(0.005 + (ts.추가초월확률 || 0) * 0.00001 + 외부)}`] }
+    else if (lv === 50) { 타입 = '초월 시도 (50→51)'; 확률 = [`성공 ${pct(0.005 + ((ts.추가초월확률 || 0) + _명칭보너스r.초월확률 + 초월레벨) * 0.00001 + _보석b_r.초월확률추가)}  (초월레벨 1당 +0.001%)`] }
     else if (lv === 49) { 타입 = '고정 확률'; 확률 = ['성공 0.50%  (고정 — 외부보너스 미적용)'] }
     else if (lv === 48) { 타입 = '개별 확률'; 확률 = [`성공 ${pct(s.가산48강 * 0.0005 + 외부 + _보석b_r.add48)}  (기본 0%)`] }
     else if (lv >= 44) {
@@ -3213,7 +3213,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C29</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C30</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
