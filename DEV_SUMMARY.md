@@ -4,8 +4,8 @@
 
 ## 1. 기본 정보
 - **소스 경로(현 PC)**: `C:\Users\Administrator\DpsGame`
-- **라이브 URL**: https://dnjsrmstm1.github.io/DpsGameV2/
-- **배포 대상 리포**: `dnjsrmstm1/DpsGameV2` (git remote 이름 = `neworigin`) — ⚠️ `DpsGame`(origin) 아님!
+- **라이브 URL**: https://perteacher.github.io/DpsGameV2/  (2026-06-14 변경, 기존 dnjsrmstm1.github.io에서 이전)
+- **배포 대상 리포**: `perteacher/DpsGameV2` (git remote 이름 = `neworigin`) — ⚠️ `DpsGame` 아님! 새 환경에선 remote/PAT를 perteacher로 설정.
 - **언어**: 식별자·주석 전부 한글.
 
 ## 2. 기술 스택
@@ -26,9 +26,10 @@ npx tsc --noEmit -p tsconfig.json          # 타입체크
 npx expo export --platform web              # dist/ 생성
 git add -A && git commit -m "..."
 git push neworigin master
-npx gh-pages -d dist -r "https://dnjsrmstm1:<GITHUB_PAT>@github.com/dnjsrmstm1/DpsGameV2.git"
+npx gh-pages -d dist -r "https://perteacher:<GITHUB_PAT>@github.com/perteacher/DpsGameV2.git"
 ```
-- `<GITHUB_PAT>` = dnjsrmstm1 계정의 GitHub Personal Access Token (이 문서엔 비밀상 미기재 — 기존 git remote 설정 또는 비번관리자에 있음).
+- `<GITHUB_PAT>` = perteacher 계정의 GitHub Personal Access Token (이 문서엔 비밀상 미기재 — git remote 설정 또는 비번관리자에 있음).
+- (구 환경은 dnjsrmstm1 계정/PAT 였음. 2026-06-14 perteacher로 이전.)
 - **BUILD 라벨**: 타이틀에 `BUILD C31` 식으로 표시. 변경 배포마다 C## 증가 → 사용자가 캐시된 옛 빌드인지 확인용. (현재 C31)
 - 사용자는 본인 기기(PC/태블릿)에서 라이브 URL로 검증. 로컬 preview 안 씀.
 
