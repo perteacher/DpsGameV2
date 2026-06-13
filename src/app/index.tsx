@@ -383,13 +383,9 @@ function 다음초월경험치(초월lv: number): number {
   const lv = Math.max(1, 초월lv)
   return 3 * lv * (lv - 1) + 10
 }
-// 51강 강화 1회 시도당 초월경험치
+// 51강 강화 실패 시 초월경험치 1 (유닛 기본 수치 엑셀 H52)
 const 강화51초월경험 = 1
-// 52강+ 유닛 판매 시 초월경험치 (강도별, 밸런스값 — 조정 가능)
-const 판매초월경험표: Record<number, number> = {
-  52: 20, 53: 350, 54: 10000, 55: 160000, 56: 3000000,
-  57: 50000000, 58: 1000000000, 59: 30000000000, 60: 1000000000000,
-}
+// 52강+ 판매 초월경험치는 판매보상.ExP(=엑셀 '판매 경험치(초월)' F열)로 직접 지급. 별도 표 없음.
 
 // 1~56강 전부 구입 가능
 const 생산강도목록 = Array.from({ length: 50 }, (_, i) => i + 1)  // 구입은 50강까지만 (51강+ 차단)
@@ -428,7 +424,7 @@ function 판매크레딧비용(lv: number): number {
   if (lv >= 45 && lv <= 48) return 1e6
   if (lv === 49) return 1e7
   if (lv === 50) return 1e8
-  if (lv === 52) return 1e10  // 50강(1e8)→52강 절벽 완화 (기존 1e12 → 1e10): 52강 판매가 실제로 돌아가 초월경험 수급
+  if (lv === 52) return 1e12
   if (lv === 53) return 1e13
   if (lv === 54) return 1e14
   if (lv === 55) return 1e15
@@ -2226,7 +2222,6 @@ export default function App() {
         판매자각 += r.자각보주
         판매일반XP += Math.round(r.일반XP * 판매보상배수 * 경x)
         판매크레딧 += Math.round(r.크레딧 * 판매보상배수 * 재x)
-        if (s.lv >= 52) 추가초월경험 += 판매초월경험표[s.lv] ?? 0  // 52강+ 판매 → 초월경험치
         if (s.lv === 60) 희생60++  // 🎯 60강 판매 = 희생 (목표: 누적 20만)
         for (const 등급 of r.박스) 판매크리스탈드랍.push(박스개봉(등급))
       }
@@ -3213,7 +3208,7 @@ export default function App() {
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C30</Text></Text>
+      <Text style={styles.title}>DPS 강화하기 ⚔️ RTS  <Text style={{ fontSize: 11, color: '#7ed957' }}>BUILD C31</Text></Text>
 
       <View style={styles.statBox}>
         <View style={[styles.statRow, { width: '100%' }]}>
